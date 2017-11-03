@@ -7,35 +7,79 @@ This is a temporary script file.
 
 import json
 import numpy as np
+import struct
+
 
 from Layers import Conv2d,NonLinear,BN,Linear
 
-def data_loader():
+def data_loader(image,label,batch_size):
     # generater an image from datasert
-    input_image, label = get_batch()
-    
-    yield input_image,label
-    
-    
-    
+    with open(label,'rb') as lb:
+        # file header [0,9]
+        m,n = struct.unpack('>II',lb.read(8))
+        labels = np.fromfile(lb, dtype=np.uint8)
 
+    with open(image,'rb') as im:
+        m,n,r,c = struct.unpack('>IIII',im.read(16))
+        images = np.fromfile(lb,dtype=np.uint8).reshape(len(labels),28,28)
+
+    length = len(labels)
+
+    while True:
+        idxs = np.arange(labels)
+        np.random.shuffle(idxs)
+
+        for batch_idx in range(0,length,batch_size):
+
+            batch_label = labels[batch_idx:batch_idx+batch_size]
+            batch_image = images[batch_idx:batch_idx+batch_size]
+            
+            yield batch_image,batch_label
+    
+    
 class Network(Object):
     def __init__(self,**kwarg):
-         self.conv1 = Conv2d(3,64,3,3,1,1,1,1);
-         self.bn1 = BN(64);
-         self.maxpool = Maxpool(2); # 128x14x14
-         self.conv2 = Conv2d(64,64,3,3,1,1,1,1);
-         self.bn2 = BN();
-         self.averagepool = Averagepool(2); # 128x7x7
-         self.relu  = NonLinear(sub_type='relu');
-         self.softmax = NonLinear(sub_type='softmax');
-         self.linear1 = Linear(49);
-         self.linear2 = Linear(10);
-         self.is_init = False
-         self.stack = []
-         
+        self.conv1 = Conv2d(3,64,3,3,1,1,1,1);
+        self.bn1 = BN(64);
+        self.maxpool = Maxpool(2); # 128x14x14
+        self.conv2 = Conv2d(64,64,3,3,1,1,1,1);
+        self.bn2 = BN();
+        self.averagepool = Averagepool(2); # 128x7x7
+        self.relu  = NonLinear(sub_type='relu');
+        self.softmax = NonLinear(sub_type='softmax');
+        self.linear1 = Linear(49);
+        self.linear2 = Linear(10);
+        self.is_init = False
+        self.stack = []
+
     def __call__(self,input_data):
         return self.forward(input_data)
+    
+    def init_stack(self):
+        for obj in gc.get_objects():
+            if isinstance(obj, Layer):
+                self.stack.append(obj);
+        #sort the stack by id.
+        self.stack.sort(key=lambda x:x.id)
+
+    def init(self):
+        if not self.stack:
+            self.init_stack()
+        # just normal distribution.
+        for i in self.stack:
+            if i.get_name() == 'conv2d':
+                i.set_variables(np.normal.normal(0,0.02,i.get_variables().shape))
+                i.set_bais(np.normal.normal(0,0.02,i.get_bais().shape))
+            if i.get_name == 'bn':
+                i.set_variables(np.normal.normal(1,0.02,i.get_variables().shape))
+                i.set_bais(np.normal.normal(1,0.02,i.get_bais().shape))
+            if i.get_name == 'linear':
+                i.set_variables(np.normal.normal(0,0.02,i.get_variables().shape))
+                i.set_bais(np.normal.normal(0,0.02,i.get_bais().shape))
+
+    def get_stack(self):
+        return self.stack
+
         
     def forward(self,input_data):
         
@@ -45,21 +89,8 @@ class Network(Object):
         
         x3 = self.softmax(self.linear1(self.linear2(x2)))
         
-        if not self.is_init:
-            # FIND THE OBJECT WHICH IS THE INSTANCE OF lAYER
-            self.get_stack();
-            self.is_init = True            
-        
         return x3
         
-    
- ###               
- ###   def backward(self,input_data,gradient_data):
-#        # from the top do the backward 
- ##       for i in range(len(self.stack),1):
- ###           input_data = self.stack[i-1].get_input()
-##            gradient_data = i.backward(input_data,gradient_data)
-            
 
         
 class CrossEntropy(Object):
@@ -117,6 +148,9 @@ if name == '__main__':
     iteration = 120000
     batch_size = 128
     
+    traing_samples = 'train-images.idx3-ubyte' 
+    traing_labels = 'train-labels.idx1-ubyte'
+
     parameters = {
                 lr:0.001,
                 beta1:0.9,
@@ -150,5 +184,3 @@ if name == '__main__':
         optimizer(parameters)
 
         
-    # -*- coding: utf-8 -*-
-
