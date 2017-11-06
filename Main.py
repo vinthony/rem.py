@@ -8,9 +8,10 @@ This is a temporary script file.
 import json
 import numpy as np
 import struct
+import gc
 
 
-from Layers import Conv2d,NonLinear,BN,Linear
+from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool
 
 def data_loader(image,label,batch_size):
     # generater an image from datasert
@@ -37,16 +38,15 @@ def data_loader(image,label,batch_size):
             yield batch_image,batch_label
     
     
-class Network(Object):
+class Network:
     def __init__(self,**kwarg):
         self.conv1 = Conv2d(3,64,3,3,1,1,1,1);
         self.bn1 = BN(64);
         self.maxpool = Maxpool(2); # 128x14x14
         self.conv2 = Conv2d(64,64,3,3,1,1,1,1);
-        self.bn2 = BN();
+        self.bn2 = BN(64);
         self.averagepool = Averagepool(2); # 128x7x7
         self.relu  = NonLinear(sub_type='relu');
-        self.softmax = NonLinear(sub_type='softmax');
         self.linear1 = Linear(49);
         self.linear2 = Linear(10);
         self.is_init = False
@@ -68,13 +68,13 @@ class Network(Object):
         # just normal distribution.
         for i in self.stack:
             if i.get_name() == 'conv2d':
-                i.set_variables(np.normal.normal(0,0.02,i.get_variables().shape))
+                i.set_weights(np.normal.normal(0,0.02,i.get_variables().shape))
                 i.set_bais(np.normal.normal(0,0.02,i.get_bais().shape))
             if i.get_name == 'bn':
-                i.set_variables(np.normal.normal(1,0.02,i.get_variables().shape))
+                i.set_weights(np.normal.normal(1,0.02,i.get_variables().shape))
                 i.set_bais(np.normal.normal(1,0.02,i.get_bais().shape))
             if i.get_name == 'linear':
-                i.set_variables(np.normal.normal(0,0.02,i.get_variables().shape))
+                i.set_weights(np.normal.normal(0,0.02,i.get_variables().shape))
                 i.set_bais(np.normal.normal(0,0.02,i.get_bais().shape))
 
     def get_stack(self):
@@ -90,15 +90,23 @@ class Network(Object):
         x3 = self.softmax(self.linear1(self.linear2(x2)))
         
         return x3
+    
+    def backward(self,grad_from_output):
+        if not self.stack:
+            self.get_stack();
+        for i in self.stack:
+            grad_from_output = i.backward(i.input,grad_from_output)
+        return grad_from_output
         
 
         
-class CrossEntropy(Object):
+class CrossEntropy:
     # cross entropy
     def __init__(self):
         # init
+        pass
     def __call__(self,input_data):
-        return forward(input_data)
+        return self.forward(input_data)
         
     def forward(self,input_data):
         # -log(exp(x[i])/(sum(exp(x[j])) ))
@@ -110,20 +118,20 @@ class CrossEntropy(Object):
         # - (x[i] - log(\sum(exp(x[j])))
         #  x[i] -1
         # batchsize * 10, 
-        idx_of_target = np.equal(input_data,target);
+        idx_of_target = np.equal(input_data,target_data);
         return input_data - idx_of_target.dtype('uint8')
     
-class Optimizer(Object):
+class Optimizer:
     
     def __init__(self,parameters):
-        self.alpha = parameters['lr']
+        self.lr = parameters['lr']
         self.beta1 = parameters['beta1']
         self.beta2 = parameters['beta2']
         self.stack = []
         self.t = 0
       
         
-    def get_stack(self):
+    def init_stack(self):
         for obj in gc.get_objects():
             if isinstance(obj, Layer):
                 self.stack.append(obj);
@@ -131,18 +139,35 @@ class Optimizer(Object):
         self.stack.sort(key=lambda x:x.id)
     
     def __call__(self,paramters):
-        self.alpha = parameters['lr']
+        self.lr = parameters['lr']
         self.beta1 = parameters['beta1']
         self.beta2 = parameters['beta2']
         if not self.stack:
-            self.get_stack()
-            for i in self.stack:
+            self.init_stack()
+#            for layer in self.stack:
+#                if layer.type == 'conv' or layer.type == 'bn' or layer.type == 'linear':
+#                    # init weights
+#                    w = layer.get_weights()
+#                    b = layer.get_bais()
+#                    # update the parameters
+#                    w = w - self.lr * layer.grad_for_parameters()
+#                    b = b - self.lr * layer.grad_for_bais()
+#                    
+#                    layer.set_weights(w)
+#                    layer.set_bais(b)
+        for layer in self.stack:
+            if layer.type == 'conv' or layer.type == 'bn' or layer.type == 'linear':
+                w = layer.get_weights()
+                b = layer.get_bais()
+                # update the parameters
+                w = w - self.lr * layer.grad_for_parameters()
+                b = b - self.lr * layer.grad_for_bais()
                 
-        # the first time 
-            
-        # optimizer    
+                layer.set_weights(w)
+                layer.set_bais(b)
 
-if name == '__main__':
+
+if 'name' == '__main__':
     
     # some hyper parameters.
     iteration = 120000
@@ -152,9 +177,9 @@ if name == '__main__':
     traing_labels = 'train-labels.idx1-ubyte'
 
     parameters = {
-                lr:0.001,
-                beta1:0.9,
-                beta2:0.999,
+                "lr":0.001,
+                "beta1":0.9,
+                "beta2":0.999,
             }
      
     # main for loops
@@ -164,7 +189,7 @@ if name == '__main__':
     
     network = Network()
    
-    optimizer = Optimizer(paramters)
+    optimizer = Optimizer(parameters)
 
     
     for i in range(iteration):
