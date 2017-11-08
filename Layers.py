@@ -26,20 +26,22 @@ def im2col(imgray,k,stride,padding):
         for x in range(w):
             # if border, padding
             if y == 0 or x == 0 or y == h-1 or x == w-1:
-                re[] = 
+                # re[] = 
+                print('border')
             else:
                 re[:,w*(x-1)+h] = imgray[y-r:y+r,x-r:x+c]
     
     return re;
 
-class Layer(Object):
+class Layer(object):
     
     def __init__(self):
         self.type = 'Layer'
+        self.callid = None
 
     def __call__(self,data):
-        if self.id == None:
-            self.id = time.time()
+        if self.callid == None:
+            self.callid = time.time()
             
         return self.forward(data)
     
@@ -66,41 +68,39 @@ class Layer(Object):
         self.bais = bais
 
 
-class NonLinear(Object):
+class NonLinear(object):
     
     def __init__(self,subtype):
+        super(NonLinear,self).__init__()
         self.type =subtype
+        self.id = time.time()
 
     def __call__(self,data):
         if self.id == None:
             self.id = time.time()
-            
         return self.forward(data)
 
     def forward(self, input_data):
         if self.type.lower() == 'relu':
-            self.output = np.maximum(input_data,np.zeros(input_data.shape)
-       
-        
+            self.output = np.maximum(input_data,np.zeros(input_data.shape))
+        return self.output
+
     def backward(self, input_data, grad_from_back):
-        
         if self.type.lower() == 'relu':
             self.grad = grad_from_back * np.greater(input_data,0).astype('byte')
         return self.grad
     
 class Conv2d(Layer):
-    def __init__(self,input_channel,output_channel,kernel,stride=1,padding):
-        super.__init__(self)
+    def __init__(self,input_channel,output_channel,kernel,stride,padding):
+        super(Conv2d,self).__init__()
         self.type = 'conv2d'
         self.input_channel = input_channel
         self.output_channel  = output_channel
         self.kernel = kernel
         self.stride = stride
         self.padding = padding
-        self.weight = np.zeros((output_channel,kernel,kernel))
+        self.weight = np.zeros((output_channel,kernel[0],kernel[1]))
         self.bais  = np.zeros(output_channel)
-        self.adamM = 0
-        self.adamV = 0
         
     def __call__(self,data):
         if self.id == None:
@@ -121,7 +121,7 @@ class Conv2d(Layer):
             imcol_all = np.zeros(ch*self.kernel[0]*self.kernel[1],self.output_x*self.output_y)
             for j in range(ch):
                 imcol_all[j:j+self.kernel[0]*self.kernel[1],-1] = im2col(input_data[i,j,:,:],self.kernel,self.stride,self.padding)
-            imkol_all = np.repeat( np.resize(self.weight,(self.output_channel,(self.kernel[0]*self.kernel[1])),ch, axis=1)
+            imkol_all = np.repeat( np.resize(self.weight,(self.output_channel,(self.kernel[0]*self.kernel[1]))),ch, axis=1)
             im = np.reshape(np.dot(imkol_all,imcol_all),(self.output_channel,self.output_y,self.output_x)); # [oc , ch*kk ] x [ch*kk,ox*oy]
             self.output[i] = im;
         return self.output
@@ -130,47 +130,125 @@ class Conv2d(Layer):
         pass
 
    
+class BN(Layer):
+    def __init__(self,channel):
+        self.type = 'bn'
+        self.channel = channel
+        self.eps = 1e-5
+        self.weight = np.zeros(channel);
+        self.bais = np.zeros(channel);
 
-   
+    def forward(self,input_data):
 
+        bs,c,w,h = self.input_data.shape
+
+        # mean [batch,ch,w,h]
+        self.m = np.mean(input_data,axis=0,keepdims=True)
+        # variance
+        self.v = np.var(input_data,axis=0,keepdims=True)
+        #normalize [bs,ch,w,h]
+        self.x_hat = (input_data - np.repeat(self.m,bs,axis=0) ) / (np.repeat(np.sqrt(self.v),bs,axis=0) + self.eps)
+
+        self.output = self.x_hat * self.weight + self.bais
+
+        return self.output
+
+    def backward(self,input_data,grad_from_back):
+
+        self.bais_grad = np.sum()
+
+
+class Maxpool(Layer):
+    def __init__(self):
+        self.type = 'maxpool'
+
+class Averagepool(Layer):
+    def __init__(self):
+        self.type = 'averagepool'
 
 
 class Linear(Layer):
-    def __init__(self,input_channel,output_channel,kernel,stride=1,padding):
-        super.__init__(self)
+    def __init__(self,input_channel,output_channel):
+        super(Linear,self).__init__()
         self.type = 'linear'
+        self.id = time.time()
         self.input_channel = input_channel
         self.output_channel  = output_channel
-        self.kernel = kernel
-        self.stride = stride
-        self.padding = padding
-        self.weight = np.zeros(input_channel)
-        self.weight_grad = np.zeros(input_channel)
-        self.bais  = np.zeros(input_channel)
-        self.bais_grad = np.zeros(input_channel)
-        self.adamM = 0
-        self.adamV = 0
-        
+        self.weight = np.zeros( (input_channel,output_channel) )
+        self.weight_grad = np.zeros( (input_channel,output_channel) )
+        self.bais  = np.zeros(output_channel)
+        self.bais_grad = np.zeros(output_channel)
+        self.grad_input = np.zeros(input_channel)
+
     def __call__(self,data):
-        if self.id == None:
-            self.id = time.time()
+        if self.callid == None:
+            self.callid = time.time()
             
         return self.forward(data)
         
     def forward(self, input_data):
-        # bs x c
-        
+        # bs x ic
         bs,c = input_data.shape
-        
+        self.input = input_data
+        #bs x oc
         self.output = np.zeros((bs,self.output_channel))
         
         for i in range(bs):
-            _m = np.repeat(self.input_data[i],self.output_channel,axis=0)# OC x IC
-            self.output[i] = np.dot(_m,self.weight) + self.bais # [ic] = [ocxoc]
+            # y = W * x + b     ic \times ic x oc + oc
+            self.output[i] = np.dot(input_data[i],self.weight) + self.bais
            
         return self.output
         
         
     def backward(self, input_data, grad_from_back):
-        pass
+        # w*X + b = y
+        # dy / db = 1 * g_f_b
+        # dy / dw = X * g_f_b
+        # dy / dX = w * g_f_b
+
+        # [bs x ic] 
+        bs,c = input_data.shape
+
+        # bs x oc  grad_from_back
+
+        self.weight_grad.fill(.0)
+        self.bais_grad.fill(.0)
+        self.grad_input = np.zeros( (bs,c))
+        # [oc x ic]      
+        for i in range(bs):
+            # [ oc * ic ]
+
+            # oc x ic \times  oc x ic
+            self.weight_grad += np.transpose(np.multiply(np.repeat(grad_from_back[i].reshape(-1,1),self.input_channel,axis=1), np.repeat(input_data[i].reshape(1,-1),self.output_channel,axis=0)) )
+            self.bais_grad += grad_from_back[i]
+            self.grad_input[i] =  np.dot(self.weight, grad_from_back[i]) 
+
+        self.weight_grad /= bs
+        self.bais_grad /= bs 
+        self.grad_input /= bs 
+
+        return self.grad_input
+
+    def get_weight(self):
+        return self.weight
+
+    def get_bais(self):
+        return self.bais
+
+    def set_weights(self,weight):
+        self.weight = weight
+
+    def set_bais(self,bais):
+        self.bais  = bais
+
+    def get_weights_grad(self):
+        return self.weight_grad
+    
+    def get_bais_grad(self):
+        return self.bais_grad
+
+
+
+
+
     

@@ -22,12 +22,12 @@ def data_loader(image,label,batch_size):
 
     with open(image,'rb') as im:
         m,n,r,c = struct.unpack('>IIII',im.read(16))
-        images = np.fromfile(lb,dtype=np.uint8).reshape(len(labels),28,28)
+        images = np.fromfile(im,dtype=np.uint8).reshape(len(labels),28,28)
 
     length = len(labels)
 
     while True:
-        idxs = np.arange(labels)
+        idxs = np.arange(length)
         np.random.shuffle(idxs)
 
         for batch_idx in range(0,length,batch_size):
@@ -38,18 +38,12 @@ def data_loader(image,label,batch_size):
             yield batch_image,batch_label
     
     
-class Network:
-    def __init__(self,**kwarg):
-        self.conv1 = Conv2d(3,64,3,3,1,1,1,1);
-        self.bn1 = BN(64);
-        self.maxpool = Maxpool(2); # 128x14x14
-        self.conv2 = Conv2d(64,64,3,3,1,1,1,1);
-        self.bn2 = BN(64);
-        self.averagepool = Averagepool(2); # 128x7x7
-        self.relu  = NonLinear(sub_type='relu');
-        self.linear1 = Linear(49);
-        self.linear2 = Linear(10);
-        self.is_init = False
+class Network(object):
+    def __init__(self):
+        self.linear1 = Linear(28*28,14*14);
+        self.linear2 = Linear(14*14,7*7);
+        self.linear3 = Linear(7*7,10);
+        self.relu = NonLinear(subtype='relu')
         self.stack = []
 
     def __call__(self,input_data):
@@ -60,7 +54,8 @@ class Network:
             if isinstance(obj, Layer):
                 self.stack.append(obj);
         #sort the stack by id.
-        self.stack.sort(key=lambda x:x.id)
+        self.stack.sort(key=lambda x:x.callid)
+        self.stack = self.stack[::-1]
 
     def init(self):
         if not self.stack:
@@ -68,14 +63,14 @@ class Network:
         # just normal distribution.
         for i in self.stack:
             if i.get_name() == 'conv2d':
-                i.set_weights(np.normal.normal(0,0.02,i.get_variables().shape))
-                i.set_bais(np.normal.normal(0,0.02,i.get_bais().shape))
-            if i.get_name == 'bn':
-                i.set_weights(np.normal.normal(1,0.02,i.get_variables().shape))
-                i.set_bais(np.normal.normal(1,0.02,i.get_bais().shape))
-            if i.get_name == 'linear':
-                i.set_weights(np.normal.normal(0,0.02,i.get_variables().shape))
-                i.set_bais(np.normal.normal(0,0.02,i.get_bais().shape))
+                i.set_weights(np.random.normal(0,0.02,i.get_weight().shape))
+                i.set_bais(np.random.normal(0,0.02,i.get_bais().shape))
+            if i.get_name() == 'bn':
+                i.set_weights(np.random.normal(1,0.02,i.get_weight().shape))
+                i.set_bais(np.random.normal(1,0.02,i.get_bais().shape))
+            if i.get_name() == 'linear':
+                i.set_weights(np.random.normal(0,0.02,i.get_weight().shape))
+                i.set_bais(np.random.normal(0,0.02,i.get_bais().shape))
 
     def get_stack(self):
         return self.stack
@@ -83,15 +78,16 @@ class Network:
         
     def forward(self,input_data):
         
-        x1 = self.bn1(self.relu(self.conv1(input_data)))
+        op = self.linear3(
+                    self.relu(self.linear2(
+                        self.relu(self.linear1(input_data))
+                        )
+                    )
+                )
         
-        x2 = self.bn2(self.relu(self.conv2(x1)))
-        
-        x3 = self.softmax(self.linear1(self.linear2(x2)))
-        
-        return x3
+        return op
     
-    def backward(self,grad_from_output):
+    def backward(self,input_data,grad_from_output):
         if not self.stack:
             self.get_stack();
         for i in self.stack:
@@ -100,27 +96,37 @@ class Network:
         
 
         
-class CrossEntropy:
+class CrossEntropy(object):
     # cross entropy
     def __init__(self):
-        # init
+        self.eps = 1e-9
         pass
-    def __call__(self,input_data):
-        return self.forward(input_data)
+    def __call__(self,input_data,target_data):
+        return self.forward(input_data,target_data)
         
-    def forward(self,input_data):
-        # -log(exp(x[i])/(sum(exp(x[j])) ))
+    def forward(self,input_data,target_data):
+        # transform target_data[bs,10] to matrix [bs,10]
         ee = np.exp(input_data) 
-        sf = ee / np.sum(ee)
-        return np.sum(-np.log(input_data * sf))
+        sf = ee / np.sum(ee,axis=1).reshape((-1,1))
+        
+        self.output = np.mean(np.sum(-target_data * np.log(sf+self.eps),axis=1))
+        
+        return self.output
         
     def backward(self,input_data,target_data):
         # - (x[i] - log(\sum(exp(x[j])))
         #  x[i] -1
         # batchsize * 10, 
         idx_of_target = np.equal(input_data,target_data);
-        return input_data - idx_of_target.dtype('uint8')
+        return input_data - idx_of_target.astype(np.uint8)
     
+def getMatrixOfClass(target_data,labels=10):
+    bs, = target_data.shape
+    mx = np.zeros((bs,10))
+    idx = np.arange(bs)
+    mx[idx[:],target_data[:]] = 1;
+    return mx
+
 class Optimizer:
     
     def __init__(self,parameters):
@@ -136,7 +142,7 @@ class Optimizer:
             if isinstance(obj, Layer):
                 self.stack.append(obj);
         #sort the stack by id.
-        self.stack.sort(key=lambda x:x.id)
+        self.stack.sort(key=lambda x:x.callid)
     
     def __call__(self,paramters):
         self.lr = parameters['lr']
@@ -160,15 +166,14 @@ class Optimizer:
                 w = layer.get_weights()
                 b = layer.get_bais()
                 # update the parameters
-                w = w - self.lr * layer.grad_for_parameters()
-                b = b - self.lr * layer.grad_for_bais()
+                w = w - self.lr * layer.get_weights_grad()
+                b = b - self.lr * layer.get_bais_grad()
                 
                 layer.set_weights(w)
                 layer.set_bais(b)
 
+if __name__ == '__main__':
 
-if 'name' == '__main__':
-    
     # some hyper parameters.
     iteration = 120000
     batch_size = 128
@@ -184,26 +189,32 @@ if 'name' == '__main__':
      
     # main for loops
     
-    _iter = data_loader(batch_size)
-    
+    _iter = data_loader(traing_samples,traing_labels,batch_size)
     
     network = Network()
+
+    network.init()
    
     optimizer = Optimizer(parameters)
 
+    criterion = CrossEntropy()
     
     for i in range(iteration):
         
         input_image, label = _iter.next()
-        
-        # forward the netwrok;
-        xlabel = Network(input_image)
-        
+
+        label = getMatrixOfClass(label)
+
+        # forward the ;
+        xlabel = network(np.reshape(input_image,(batch_size,28*28)))
         # backward network;
-        loss = CrossEntropy(xlabel,label)
-        d_loss_network = CrossEntropy.backward(xlabel,label)
+        loss = criterion(xlabel,label)
+
+        print(loss)
+
+        d_loss_network = criterion.backward(xlabel,label)
         
-        Network.backward(input_image,d_loss_network)
+        network.backward(input_image,d_loss_network)
         
         # optimizer parameters
         optimizer(parameters)
