@@ -105,20 +105,21 @@ class CrossEntropy(object):
         return self.forward(input_data,target_data)
         
     def forward(self,input_data,target_data):
-        # transform target_data[bs,10] to matrix [bs,10]
+        # bs x 10
         ee = np.exp(input_data) 
         sf = ee / np.sum(ee,axis=1).reshape((-1,1))
+
+        self.softmax = sf;
         
         self.output = np.mean(np.sum(-target_data * np.log(sf+self.eps),axis=1))
         
         return self.output
         
     def backward(self,input_data,target_data):
-        # - (x[i] - log(\sum(exp(x[j])))
-        #  x[i] -1
+        # \sum( - t * log(exp(i)/ \sum(exp(i)) )) 
         # batchsize * 10, 
-        idx_of_target = np.equal(input_data,target_data);
-        return input_data - idx_of_target.astype(np.uint8)
+
+        return self.softmax - target_data
     
 def getMatrixOfClass(target_data,labels=10):
     bs, = target_data.shape
@@ -150,17 +151,6 @@ class Optimizer:
         self.beta2 = parameters['beta2']
         if not self.stack:
             self.init_stack()
-#            for layer in self.stack:
-#                if layer.type == 'conv' or layer.type == 'bn' or layer.type == 'linear':
-#                    # init weights
-#                    w = layer.get_weights()
-#                    b = layer.get_bais()
-#                    # update the parameters
-#                    w = w - self.lr * layer.grad_for_parameters()
-#                    b = b - self.lr * layer.grad_for_bais()
-#                    
-#                    layer.set_weights(w)
-#                    layer.set_bais(b)
         for layer in self.stack:
             if layer.type == 'conv' or layer.type == 'bn' or layer.type == 'linear':
                 w = layer.get_weights()
@@ -206,7 +196,7 @@ if __name__ == '__main__':
         label = getMatrixOfClass(label)
 
         # forward the ;
-        xlabel = network(np.reshape(input_image,(batch_size,28*28)))
+        xlabel = network(np.reshape(input_image,(-1,28*28)))
         # backward network;
         loss = criterion(xlabel,label)
 

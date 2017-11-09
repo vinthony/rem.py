@@ -213,7 +213,7 @@ class Linear(Layer):
 
         self.weight_grad.fill(.0)
         self.bais_grad.fill(.0)
-        self.grad_input = np.zeros( (bs,c))
+        self.grad_input = np.zeros((bs,c))
         # [oc x ic]      
         for i in range(bs):
             # [ oc * ic ]
