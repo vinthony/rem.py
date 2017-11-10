@@ -39,12 +39,19 @@ class Layer(object):
         self.type = 'Layer'
         self.callid = None
 
+
     def __call__(self,data):
         if self.callid == None:
             self.callid = time.time()
             
         return self.forward(data)
+
     
+    def __repr__(self):
+
+        return json.dumps(self.__dict__.iteritems())
+
+
     def get_name(self):
         return self.type
 
