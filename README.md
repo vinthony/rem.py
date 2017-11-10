@@ -69,4 +69,6 @@ I will find someway else for more complex network structure.
 
 # some results
 
-![accuracy](https://raw.githubusercontent.com/vinthony/rem.py/blob/master/asserts/default.png)
+default network structure(as shown above) validates on MNIST test set.
+
+![accuracy](https://github.com/vinthony/rem.py/blob/master/assets/default.png)
