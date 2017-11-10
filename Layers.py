@@ -9,29 +9,7 @@ import time
 import numpy as np
 import json
 
-def im2col(imgray,k,stride,padding):
-    r = k[0]//2;
-    c = k[1]//2;
-    
-    sr = stride[0];
-    sc = stride[1];
-    
-    pr = padding[0];
-    pc = padding[1];
-
-    h,w = imgray.shape
-    
-    re = np.zeros(r*c,(h-1)*stride * (w-1)*stride);
-    for y in range(h):
-        for x in range(w):
-            # if border, padding
-            if y == 0 or x == 0 or y == h-1 or x == w-1:
-                # re[] = 
-                print('border')
-            else:
-                re[:,w*(x-1)+h] = imgray[y-r:y+r,x-r:x+c]
-    
-    return re;
+from utils import im2col
 
 class Layer(object):
     
@@ -87,16 +65,10 @@ class Layer(object):
 
 
 class NonLinear(object):
-    
     def __init__(self,subtype,**kwags):
         super(NonLinear,self).__init__(**kwags)
         self.type =subtype
         self.id = time.time()
-
-    def __call__(self,data):
-        if self.id == None:
-            self.id = time.time()
-        return self.forward(data)
 
     def forward(self, input_data):
         if self.type.lower() == 'relu':
@@ -119,12 +91,6 @@ class Conv2d(Layer):
         self.padding = padding
         self.weight = np.zeros((output_channel,kernel[0],kernel[1]))
         self.bias  = np.zeros(output_channel)
-        
-    def __call__(self,data):
-        if self.id == None:
-            self.id = time.time()
-            
-        return self.forward(data)
         
     def forward(self, input_data):
         # bs x ch x w x h
@@ -173,7 +139,13 @@ class BN(Layer):
 
     def backward(self,input_data,grad_from_back):
 
-        self.bias_grad = np.sum()
+        self.bias_grad = grad_from_back
+        
+        self.weight_grad = self.x_hat
+        
+        self.grad_input = self.weight
+        
+        return self.grad_input
 
 
 class Maxpool(Layer):
@@ -198,12 +170,6 @@ class Linear(Layer):
         self.bias_grad = np.zeros(output_channel)
         self.grad_input = np.zeros(input_channel)
 
-    def __call__(self,data):
-        if self.callid == None:
-            self.callid = time.time()
-            
-        return self.forward(data)
-        
     def forward(self, input_data):
         # bs x ic
         bs,c = input_data.shape

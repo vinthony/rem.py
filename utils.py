@@ -48,3 +48,27 @@ def accuracy(input_label, target_label):
     il = np.argmax(input_label);
     tl = np.argmax(target_label)
     return il == tl
+
+def im2col(imgray,k,stride,padding):
+    r = k[0]//2;
+    c = k[1]//2;
+    
+    sr = stride[0];
+    sc = stride[1];
+    
+    pr = padding[0];
+    pc = padding[1];
+
+    h,w = imgray.shape
+    
+    re = np.zeros(r*c,(h-1)*stride * (w-1)*stride);
+    for y in range(h):
+        for x in range(w):
+            # if border, padding
+            if y == 0 or x == 0 or y == h-1 or x == w-1:
+                # re[] = 
+                print('border')
+            else:
+                re[:,w*(x-1)+h] = imgray[y-r:y+r,x-r:x+c]
+    
+    return re;
