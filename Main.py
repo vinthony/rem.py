@@ -30,9 +30,9 @@ class Network(Model):
 if __name__ == '__main__':
 
     iteration = 120000
-    batch_size = 128
-    save_iter = 4000
-    validate_iter = 10
+    batch_size = 256
+    save_iter = 100
+    validate_iter = 20
     disp_iter = 5
     
     traing_samples = 'train-images.idx3-ubyte' 
