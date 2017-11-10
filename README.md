@@ -12,7 +12,7 @@ a toy neural network based on python
     - [x] linear
     
 * loss:
-    - [ ] L1/L2
+    - [x] L1/L2
     - [x] cross entropy
 * init:
     - [ ] Xavier
@@ -60,3 +60,13 @@ class Network(Model):
 
 ```
 
+# currently
+
+currently, I am checking the network structure from `gc`, it is ugly and hackable for feed-forward network.
+
+I will find someway else for more complex network structure.
+
+
+# some results
+
+![accuracy](https://raw.githubusercontent.com/vinthony/rem.py/blob/master/asserts/default.png)
