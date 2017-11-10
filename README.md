@@ -8,15 +8,24 @@ a toy neural network based on python
     - [ ] Conv2d
     - [ ] Batch normalization
     - [ ] pooling
+    - [x] relu
+    - [x] linear
     
 * loss:
     - [ ] L1/L2
-
+    - [x] cross entropy
+* init:
+    - [ ] Xavier
+    - [ ] Kaiming
+    - [x] normal
+     
 * optimizer:
     - [ ] adam
     - [ ] rmsprop
+    - [x] sgd
     
 * backend:
+    - [ ] c/cpp
     - [ ] cuda
 
 # easy to use
