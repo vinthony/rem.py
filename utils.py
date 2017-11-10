@@ -1,15 +1,13 @@
 import numpy as np
+import struct
 
-def save_model(f,network):
+def save_model(filename,network):
     # save the weight of network;
     # save the structure of network;
-    f.create_dataset('network',(len(repr(network))),'s10',repr(network))
-    stack = network.get_stack()
-    re = dict()
-    for i in stack:
-        re[i.type+''+i.callid+'_w'] = i.get_weights()
-        re[i.type+''+i.callid+'_b'] = i.get_bias()
-    f.create_dataset('weight',len(json.dump(re)),'s10',json.dump(re))
+    #f = h5py.File(filename,"w")
+    #f.create_dataset('network',  len(repr(network)) ,'s10',repr(network))
+    with open(filename, 'w') as f:
+        network.save(f)
 
 def getMatrixOfClass(target_data,labels=10):
     bs, = target_data.shape
@@ -33,7 +31,9 @@ def data_loader(image,label,batch_size):
 
     while True:
         idxs = np.arange(length)
-        np.random.shuffle(idxs)
+        
+        if batch_size > 1:
+            np.random.shuffle(idxs)
 
         for batch_idx in range(0,length,batch_size):
 
@@ -41,3 +41,10 @@ def data_loader(image,label,batch_size):
             batch_image = images[batch_idx:batch_idx+batch_size]
             
             yield batch_image,batch_label
+            
+def accuracy(input_label, target_label):
+    input_label = np.reshape(input_label,(1,-1))
+    target_label = np.reshape(target_label,(1,-1))
+    il = np.argmax(input_label);
+    tl = np.argmax(target_label)
+    return il == tl

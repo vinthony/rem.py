@@ -97,3 +97,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+*.json
+*.idx3-ubyte
+*.idx1-ubyte

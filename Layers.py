@@ -7,7 +7,7 @@ Created on Fri Nov  3 00:17:08 2017
 
 import time
 import numpy as np
-
+import json
 
 def im2col(imgray,k,stride,padding):
     r = k[0]//2;
@@ -35,21 +35,26 @@ def im2col(imgray,k,stride,padding):
 
 class Layer(object):
     
-    def __init__(self):
+    def __init__(self,callid=None):
         self.type = 'Layer'
-        self.callid = None
-
+        self.callid = callid
 
     def __call__(self,data):
         if self.callid == None:
             self.callid = time.time()
             
         return self.forward(data)
-
     
     def __repr__(self):
-
-        return json.dumps(self.__dict__.iteritems())
+        dic  = {}
+        for k,v in self.__dict__.items():
+            if type(v) == type(np.zeros(1)):
+                if k == 'weight' or k == 'bias':
+                    v = v.tolist()
+                else:
+                    continue
+            dic[k] = v 
+        return json.dumps(dic)
 
 
     def get_name(self):
@@ -65,20 +70,26 @@ class Layer(object):
     def get_weights(self):
         return self.weight
     
-    def get_bais(self):
-        return self.bais
+    def get_bias(self):
+        return self.bias
 
     def set_weights(self,weight):
         self.weight = weight
 
-    def set_bais(self,bais):
-        self.bais = bais
+    def set_bias(self,bias):
+        self.bias = bias
+    
+    def get_weights_grad(self):
+        return self.weight_grad
+    
+    def get_bias_grad(self):
+        return self.bias_grad
 
 
 class NonLinear(object):
     
-    def __init__(self,subtype):
-        super(NonLinear,self).__init__()
+    def __init__(self,subtype,**kwags):
+        super(NonLinear,self).__init__(**kwags)
         self.type =subtype
         self.id = time.time()
 
@@ -107,7 +118,7 @@ class Conv2d(Layer):
         self.stride = stride
         self.padding = padding
         self.weight = np.zeros((output_channel,kernel[0],kernel[1]))
-        self.bais  = np.zeros(output_channel)
+        self.bias  = np.zeros(output_channel)
         
     def __call__(self,data):
         if self.id == None:
@@ -143,7 +154,7 @@ class BN(Layer):
         self.channel = channel
         self.eps = 1e-5
         self.weight = np.zeros(channel);
-        self.bais = np.zeros(channel);
+        self.bias = np.zeros(channel);
 
     def forward(self,input_data):
 
@@ -156,13 +167,13 @@ class BN(Layer):
         #normalize [bs,ch,w,h]
         self.x_hat = (input_data - np.repeat(self.m,bs,axis=0) ) / (np.repeat(np.sqrt(self.v),bs,axis=0) + self.eps)
 
-        self.output = self.x_hat * self.weight + self.bais
+        self.output = self.x_hat * self.weight + self.bias
 
         return self.output
 
     def backward(self,input_data,grad_from_back):
 
-        self.bais_grad = np.sum()
+        self.bias_grad = np.sum()
 
 
 class Maxpool(Layer):
@@ -175,16 +186,16 @@ class Averagepool(Layer):
 
 
 class Linear(Layer):
-    def __init__(self,input_channel,output_channel):
-        super(Linear,self).__init__()
+    def __init__(self,input_channel,output_channel,**kwags):
+        super(Linear,self).__init__(**kwags)
         self.type = 'linear'
         self.id = time.time()
         self.input_channel = input_channel
         self.output_channel  = output_channel
         self.weight = np.zeros( (input_channel,output_channel) )
         self.weight_grad = np.zeros( (input_channel,output_channel) )
-        self.bais  = np.zeros(output_channel)
-        self.bais_grad = np.zeros(output_channel)
+        self.bias  = np.zeros(output_channel)
+        self.bias_grad = np.zeros(output_channel)
         self.grad_input = np.zeros(input_channel)
 
     def __call__(self,data):
@@ -202,7 +213,7 @@ class Linear(Layer):
         
         for i in range(bs):
             # y = W * x + b     ic \times ic x oc + oc
-            self.output[i] = np.dot(input_data[i],self.weight) + self.bais
+            self.output[i] = np.dot(input_data[i],self.weight) + self.bias
            
         return self.output
         
@@ -219,40 +230,22 @@ class Linear(Layer):
         # bs x oc  grad_from_back
 
         self.weight_grad.fill(.0)
-        self.bais_grad.fill(.0)
+        self.bias_grad.fill(.0)
         self.grad_input = np.zeros((bs,c))
         # [oc x ic]      
         for i in range(bs):
             # [ oc * ic ]
-
             # oc x ic \times  oc x ic
             self.weight_grad += np.transpose(np.multiply(np.repeat(grad_from_back[i].reshape(-1,1),self.input_channel,axis=1), np.repeat(input_data[i].reshape(1,-1),self.output_channel,axis=0)) )
-            self.bais_grad += grad_from_back[i]
+            self.bias_grad += grad_from_back[i]
             self.grad_input[i] =  np.dot(self.weight, grad_from_back[i]) 
 
         self.weight_grad /= bs
-        self.bais_grad /= bs 
+        self.bias_grad /= bs 
         self.grad_input /= bs 
 
         return self.grad_input
 
-    def get_weight(self):
-        return self.weight
-
-    def get_bais(self):
-        return self.bais
-
-    def set_weights(self,weight):
-        self.weight = weight
-
-    def set_bais(self,bais):
-        self.bais  = bais
-
-    def get_weights_grad(self):
-        return self.weight_grad
-    
-    def get_bais_grad(self):
-        return self.bais_grad
 
 
 
