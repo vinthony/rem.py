@@ -9,7 +9,7 @@ import time
 import numpy as np
 import json
 
-from utils import im2col
+from utils import im2col,imremap
 
 class Layer(object):
     
@@ -64,18 +64,23 @@ class Layer(object):
         return self.bias_grad
 
 
-class NonLinear(object):
+class NonLinear(Layer):
     def __init__(self,subtype,**kwags):
         super(NonLinear,self).__init__(**kwags)
         self.type =subtype
         self.id = time.time()
 
     def forward(self, input_data):
+        self.input = input_data
         if self.type.lower() == 'relu':
             self.output = np.maximum(input_data,np.zeros(input_data.shape))
         return self.output
 
     def backward(self, input_data, grad_from_back):
+        
+        if input_data.shape != grad_from_back.shape:
+            grad_from_back = np.reshape(grad_from_back,input_data.shape)
+
         if self.type.lower() == 'relu':
             self.grad = grad_from_back * np.greater(input_data,0).astype('byte')
         return self.grad
@@ -89,29 +94,53 @@ class Conv2d(Layer):
         self.kernel = kernel
         self.stride = stride
         self.padding = padding
-        self.weight = np.zeros((output_channel,kernel[0],kernel[1]))
+        self.weight = np.zeros((output_channel,input_channel,kernel[0],kernel[1]))
+        self.weight_grad = np.zeros((output_channel,input_channel,kernel[0],kernel[1]))
         self.bias  = np.zeros(output_channel)
+        self.bias_grad = np.zeros(output_channel)
         
     def forward(self, input_data):
         # bs x ch x w x h
-        bs,ch,w,h = input_data.shape
+        bs,ch,h,w = input_data.shape
         
-        self.output_x = (w-2*self.padding[0] + self.kernel[0] )//self.stride[0] + 1;
-        self.output_y = (h-2*self.padding[1] + self.kernel[1] )//self.stride[1] + 1;
+        self.input = input_data
+        self.output_x = (w + 2*self.padding[0] - self.kernel[0] )//self.stride[0] + 1;
+        self.output_y = (h + 2*self.padding[1] - self.kernel[1] )//self.stride[1] + 1;
         
-        self.output = np.zeros(bs,self.output_channel,self.output_y,self.output_x)
+        self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )    
+        self.imcol_all = np.zeros( (bs,ch*self.kernel[0]*self.kernel[1],self.output_x*self.output_y) )    
         
         for i in range(bs):
-            imcol_all = np.zeros(ch*self.kernel[0]*self.kernel[1],self.output_x*self.output_y)
             for j in range(ch):
-                imcol_all[j:j+self.kernel[0]*self.kernel[1],-1] = im2col(input_data[i,j,:,:],self.kernel,self.stride,self.padding)
-            imkol_all = np.repeat( np.resize(self.weight,(self.output_channel,(self.kernel[0]*self.kernel[1]))),ch, axis=1)
-            im = np.reshape(np.dot(imkol_all,imcol_all),(self.output_channel,self.output_y,self.output_x)); # [oc , ch*kk ] x [ch*kk,ox*oy]
-            self.output[i] = im;
+                self.imcol_all[i,j:j+self.kernel[0]*self.kernel[1],:] = im2col(input_data[i,j,:,:],self.kernel,self.stride,self.padding)
+            for oc in range(self.output_channel):
+                self.output[i,oc,:,:] = np.reshape(np.sum(self.imcol_all[i] * np.repeat(np.reshape(self.weight[oc],[-1,1]),self.output_x*self.output_y,axis=1),axis=0) + np.repeat(self.bias[oc],self.output_x*self.output_y),(self.output_y,self.output_x))
         return self.output
     
     def backward(self, input_data, grad_from_back):
-        pass
+        self.input = input_data
+        bs,ch,h,w = input_data.shape
+        if grad_from_back.ndim < 4:
+            grad_from_back = np.reshape(grad_from_back, (bs,self.output_channel,self.output_y,self.output_x) )
+
+        self.bias_grad = np.sum(np.sum(np.sum(grad_from_back,axis=3),axis=2),axis=0)
+        self.transposed_weight = np.rot90(self.weight,k=2,axes=(2,3))  # rotate 180 for derivat
+        self.grad_input = np.zeros((bs,ch,h,w))
+        # bs ch h w *k1*k2
+        for ch in range(self.output_channel):
+            # k1*k2*ch
+            self.weight_grad[ch] = np.reshape(np.sum(np.sum(self.imcol_all * np.repeat( np.reshape(grad_from_back[:,ch:ch+1,:,:],(bs,1,-1)),
+                self.kernel[0]*self.kernel[1]*self.input_channel,axis=1),axis=2),axis=0),(self.input_channel,self.kernel[0],self.kernel[1]))
+
+        self.imcol_grad_all = np.zeros( (bs,self.output_channel,self.kernel[0]*self.kernel[1],h*w) )     
+        
+        for i in range(bs):
+            for j in range(self.output_channel):
+                self.imcol_grad_all[i,j,:,:] = imremap(grad_from_back[i,j,:,:],h,w,self.kernel,self.stride,self.padding)
+            for ic in range(self.input_channel):
+                self.grad_input[i,ic,:,:] = np.reshape(np.sum( np.reshape(self.imcol_grad_all[i],(self.output_channel*self.kernel[0]*self.kernel[1],h*w)) * np.repeat(np.reshape(self.transposed_weight[:,ic,:,:],[-1,1]),h*w,axis=1),axis=0),(h,w))
+
+        return self.grad_input
 
    
 class BN(Layer):
@@ -172,7 +201,12 @@ class Linear(Layer):
 
     def forward(self, input_data):
         # bs x ic
-        bs,c = input_data.shape
+        bs = input_data.shape[0]
+
+        input_data = np.reshape(input_data,(bs,-1))
+
+        ch = self.input_channel
+
         self.input = input_data
         #bs x oc
         self.output = np.zeros((bs,self.output_channel))
@@ -214,7 +248,11 @@ class Linear(Layer):
 
 
 
+if __name__ == '__main__':
+    c = Conv2d(1,3,[3,3],[1,1],[1,1])
+    c.weight = np.reshape(np.repeat(np.array([[[1,1,1],[1,1,1],[1,1,1]]]),3,axis=0),(3,1,3,3))
 
+    print(np.array([[[[1,2,3,4],[5,6,7,8],[9,10,11,12]]]]))
+    o = c(np.array([[[[1,2,3,4],[5,6,7,8],[9,10,11,12]]]]))
 
-
-    
+    print(o)

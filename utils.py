@@ -1,5 +1,6 @@
 import numpy as np
 import struct
+import math
 
 def save_model(filename,network):
     # save the weight of network;
@@ -50,8 +51,10 @@ def accuracy(input_label, target_label):
     return il == tl
 
 def im2col(imgray,k,stride,padding):
-    r = k[0]//2;
-    c = k[1]//2;
+    h,w = imgray.shape
+
+    r = k[0];
+    c = k[1];
     
     sr = stride[0];
     sc = stride[1];
@@ -59,16 +62,56 @@ def im2col(imgray,k,stride,padding):
     pr = padding[0];
     pc = padding[1];
 
-    h,w = imgray.shape
+    output_x = (w + 2*pr - r )//sr + 1;
+    output_y = (h + 2*pc - c )//sc + 1;
     
-    re = np.zeros(r*c,(h-1)*stride * (w-1)*stride);
-    for y in range(h):
-        for x in range(w):
-            # if border, padding
-            if y == 0 or x == 0 or y == h-1 or x == w-1:
-                # re[] = 
-                print('border')
-            else:
-                re[:,w*(x-1)+h] = imgray[y-r:y+r,x-r:x+c]
+    larger = np.zeros((h+2*pr,w+2*pc))
+
+    larger[pr:pr+h,pc:pc+w] = imgray
+    
+    re = np.zeros( (r*c,output_x*output_y),dtype='float32');
+
+    for y in range(0,h+2*pr-r+1,sr):
+        for x in range(0,w+2*pc-c+1,sc):
+            re[:,output_x*(y//sr)+(x//sc)] = np.reshape(larger[y:y+r,x:x+c],(1,-1))
     
     return re;
+
+
+def imremap(imgray,oh,ow,k,stride,padding):
+    h,w = imgray.shape
+
+    r = k[0];
+    c = k[1];
+    
+    sr = stride[0];
+    sc = stride[1];
+    
+    pr = padding[0];
+    pc = padding[1];
+
+    output_x = math.ceil( (w-1)*sr + r - 2*pr ); #(w + 2*pr - r )//sr + 1;
+    output_y = math.ceil( (h-1)*sc + c - 2*pc ); #(h + 2*pc - c )//sc + 1;
+    
+    if output_x < ow: output_x = ow;
+    if output_y < oh: output_y = oh;
+
+    larger = np.zeros((h+2*pr,w+2*pc))
+
+    larger[pr:pr+h,pc:pc+w] = imgray
+    
+    re = np.zeros( (r*c,output_x*output_y),dtype='float32');
+
+    for y in range(0,h+2*pr-r+1,sr):
+        for x in range(0,w+2*pc-c+1,sc):
+            re[:,output_x*(y*sr)+(x*sc)] = np.reshape(larger[y:y+r,x:x+c],(1,-1))
+
+    return re;
+
+
+if __name__ == '__main__':
+    im = np.array([[1,2,3,4],[5,6,7,8],[9,10,11,12]]);
+    kernel = [2,2]
+    stride = [1,1]
+    padding = [1,1]
+    out = im2col(im,kernel,stride,padding)
