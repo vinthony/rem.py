@@ -8,20 +8,31 @@ Created on Fri Nov  3 00:17:08 2017
 import time
 import numpy as np
 import json
+import uuid
+
+def static_vars(**kwargs):
+    def decorate(func):
+        for k in kwargs:
+            setattr(func, k, kwargs[k])
+        return func
+    return decorate
+
 
 from utils import im2col,imremap
 
 class Layer(object):
-    
+    counter = 0
     def __init__(self,callid=None):
         self.type = 'Layer'
-        self.callid = callid
-
+        self.callid = None
+        
     def __call__(self,data):
         if self.callid == None:
-            self.callid = time.time()
-            
+            self.callid = Layer.counter
+            Layer.counter = Layer.counter + 1
+       
         return self.forward(data)
+       
     
     def __repr__(self):
         dic  = {}
@@ -40,11 +51,12 @@ class Layer(object):
 
     def forward(self, input_data):
         # forward pass
-        pass
+        return self
         
     def backward(self, input_data, grad_from_back):
         # backward pass
-        pass
+        return self
+    
     def get_weights(self):
         return self.weight
     
@@ -78,12 +90,12 @@ class NonLinear(Layer):
 
     def backward(self, input_data, grad_from_back):
         
-        if input_data.shape != grad_from_back.shape:
+        if self.input.shape != grad_from_back.shape:
             grad_from_back = np.reshape(grad_from_back,input_data.shape)
 
         if self.type.lower() == 'relu':
-            self.grad = grad_from_back * np.greater(input_data,0).astype('byte')
-        return self.grad
+            self.grad_input = grad_from_back * np.greater(input_data,0).astype('byte')
+        return self.grad_input
     
 class Conv2d(Layer):
     def __init__(self,input_channel,output_channel,kernel,stride,padding):
@@ -101,6 +113,7 @@ class Conv2d(Layer):
         
     def forward(self, input_data):
         # bs x ch x w x h
+       # t = time.time()
         bs,ch,h,w = input_data.shape
         
         self.input = input_data
@@ -115,16 +128,17 @@ class Conv2d(Layer):
                 self.imcol_all[i,j:j+self.kernel[0]*self.kernel[1],:] = im2col(input_data[i,j,:,:],self.kernel,self.stride,self.padding)
             for oc in range(self.output_channel):
                 self.output[i,oc,:,:] = np.reshape(np.sum(self.imcol_all[i] * np.repeat(np.reshape(self.weight[oc],[-1,1]),self.output_x*self.output_y,axis=1),axis=0) + np.repeat(self.bias[oc],self.output_x*self.output_y),(self.output_y,self.output_x))
+       # print('forward',time.time()-t,self.callid)
         return self.output
     
     def backward(self, input_data, grad_from_back):
-        self.input = input_data
+       # t = time.time()
         bs,ch,h,w = input_data.shape
         if grad_from_back.ndim < 4:
             grad_from_back = np.reshape(grad_from_back, (bs,self.output_channel,self.output_y,self.output_x) )
 
         self.bias_grad = np.sum(np.sum(np.sum(grad_from_back,axis=3),axis=2),axis=0)
-        self.transposed_weight = np.rot90(self.weight,k=2,axes=(2,3))  # rotate 180 for derivat
+        self.transposed_weight = np.rot90(self.weight,k=2,axes=(2,3))  # rotate 180 for derivate
         self.grad_input = np.zeros((bs,ch,h,w))
         # bs ch h w *k1*k2
         for ch in range(self.output_channel):
@@ -139,12 +153,14 @@ class Conv2d(Layer):
                 self.imcol_grad_all[i,j,:,:] = imremap(grad_from_back[i,j,:,:],h,w,self.kernel,self.stride,self.padding)
             for ic in range(self.input_channel):
                 self.grad_input[i,ic,:,:] = np.reshape(np.sum( np.reshape(self.imcol_grad_all[i],(self.output_channel*self.kernel[0]*self.kernel[1],h*w)) * np.repeat(np.reshape(self.transposed_weight[:,ic,:,:],[-1,1]),h*w,axis=1),axis=0),(h,w))
-
+        #print('backward',time.time()-t,self.callid)
         return self.grad_input
 
-   
-class BN(Layer):
+
+class SpatialBN(Layer):
     def __init__(self,channel):
+        super(SpatialBN,self).__init__()
+        #https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
         self.type = 'bn'
         self.channel = channel
         self.eps = 1e-5
@@ -153,27 +169,110 @@ class BN(Layer):
 
     def forward(self,input_data):
 
-        bs,c,w,h = self.input_data.shape
+        bs,c,h,w = self.input_data.shape
 
-        # mean [batch,ch,w,h]
+        # mean [batch,ch,h,w]
         self.m = np.mean(input_data,axis=0,keepdims=True)
         # variance
         self.v = np.var(input_data,axis=0,keepdims=True)
-        #normalize [bs,ch,w,h]
-        self.x_hat = (input_data - np.repeat(self.m,bs,axis=0) ) / (np.repeat(np.sqrt(self.v),bs,axis=0) + self.eps)
-
-        self.output = self.x_hat * self.weight + self.bias
+        
+        self.sqrt_v = np.sqrt(self.v) + self.eps;
+        #normalize [bs,ch,h,w]
+        self.x_hat = (input_data - np.repeat(self.m,bs,axis=0) ) / (np.repeat(self.sqrt_v,bs,axis=0) )
+        
+        # bs x ch x h x w
+        self.output = self.x_hat * np.repeat(self.weight,[bs,1,h,w]) + np.repeat(self.bias,[bs,1,h,w])
 
         return self.output
 
     def backward(self,input_data,grad_from_back):
+        
+        bs,c,h,w = self.input_data.shape
 
-        self.bias_grad = grad_from_back
+        self.bias_grad = np.sum(np.sum(np.sum(grad_from_back,axis=3),axis=2),axis=0)
         
-        self.weight_grad = self.x_hat
+        self.weight_grad = np.sum(np.sum(np.sum(self.x_hat*grad_from_back,axis=3),axis=2),axis=0)
         
-        self.grad_input = self.weight
+        d_hat = np.repeat(self.weight,[bs,1,h,w]) * grad_from_back
         
+        d_sqrt_var = - 1. / (self.sqrt_v**2) * d_hat
+        # bs x c x h x w
+        dvar = 0.5 * 1 / self.sqrt_v * d_sqrt_var
+        
+        dsq = np.ones((bs,c,w,h))/bs * dvar;
+        
+        d_v = 2*self.m * dsq
+        
+        d_m = d_hat * self.v
+        
+        d_mv = d_v + d_m
+        
+        d_u = -1 * np.sum(d_mv,axis=0)
+        
+        d_x2 = np.ones((bs,c,w,h))/bs * np.repeat(d_u,(bs,1,1,1))
+        
+        self.grad_input = d_x2 + d_mv
+    
+        return self.grad_input
+   
+class BN(Layer):
+    def __init__(self,channel):
+        #https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
+        super(BN,self).__init__()
+        self.type = 'bn'
+        self.channel = channel
+        self.eps = 1e-5
+        self.weight = np.zeros(channel);
+        self.bias = np.zeros(channel);
+
+    def forward(self,input_data):
+
+        bs,c = input_data.shape
+        
+        self.input = input_data
+        
+        # mean [batch,ch,h,w]
+        self.m = np.mean(input_data,axis=0,keepdims=True)
+        # variance
+        self.v = np.var(input_data,axis=0,keepdims=True)
+        
+        self.sqrt_v = np.sqrt(self.v) + self.eps;
+        #normalize [bs,ch,h,w]
+        self.x_hat = (input_data - np.repeat(self.m,bs,axis=0) ) / (np.repeat(self.sqrt_v,bs,axis=0) )
+
+        # bs x ch x h x w
+        self.output = self.x_hat * np.repeat(np.reshape(self.weight,(1,-1)),bs,axis=0) + np.repeat(np.reshape(self.bias,(1,-1)),bs,axis=0)
+
+        return self.output
+
+    def backward(self,input_data,grad_from_back):
+        
+        bs,c = self.input.shape
+
+        self.bias_grad = np.sum(grad_from_back,axis=0)
+        
+        self.weight_grad = np.sum(self.x_hat*grad_from_back,axis=0)
+        
+        d_hat = np.repeat(np.reshape(self.weight,(1,-1)),bs,axis=0) * grad_from_back
+        
+        d_sqrt_var = - 1. / (self.sqrt_v**2) * d_hat
+        # bs x c x h x w
+        dvar = 0.5 * 1 / self.sqrt_v * d_sqrt_var
+        
+        dsq = np.ones((bs,c))/bs * dvar;
+        
+        d_v = 2*self.m * dsq
+        
+        d_m = d_hat * self.v
+        
+        d_mv = d_v + d_m
+        
+        d_u = -1 * np.sum(d_mv,axis=0)
+        
+        d_x2 = np.ones((bs,c))/bs * np.repeat(np.reshape(d_u,(1,-1)),bs,axis=0)
+        
+        self.grad_input = d_x2 + d_mv
+    
         return self.grad_input
 
 
@@ -185,6 +284,28 @@ class Averagepool(Layer):
     def __init__(self):
         self.type = 'averagepool'
 
+class Dropout(Layer):
+    def __init__(self,prob,**kwags):
+        super(Dropout,self).__init__(**kwags)
+        self.prob = prob
+    
+    def forward(self,input_data):
+        self.input = input_data
+        self.saved = 1.0 - self.prob
+        self.sample = np.random.binomial(n=1,p=self.saved,size=input_data.shape)
+        
+        input_data = input_data * self.sample
+        
+        self.output = input_data / self.saved
+        
+        return self.output
+    
+    def backward(self,input_data,grad_from_back):
+        
+        self.grad_input = grad_from_back / self.saved * self.sample
+        
+        return self.grad_input
+    
 
 class Linear(Layer):
     def __init__(self,input_channel,output_channel,**kwags):

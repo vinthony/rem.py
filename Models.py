@@ -1,4 +1,5 @@
 import json
+import math
 from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool
 import numpy as np
 import gc
@@ -59,27 +60,55 @@ class Model(object):
         for obj in gc.get_objects():
             if isinstance(obj, Layer):
                 self.stack.append(obj);
+               
+            
+                
     def foward_stack(self):
         if not self.stack:
             self.init_stack()
-        self.stack.sort(key=lambda x:x.callid)
+
         return self.stack
     
 
-    def init(self):
+    def init(self,init_type):
         if not self.stack:
             self.init_stack()
         # just normal distribution.
-        for i in self.stack:
-            if i.get_name() == 'conv2d':
-                i.set_weights(np.random.normal(0,0.02,i.get_weights().shape))
-                i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
-            if i.get_name() == 'bn':
-                i.set_weights(np.random.normal(1,0.02,i.get_weights().shape))
-                i.set_bias(np.random.normal(1,0.02,i.get_bias().shape))
-            if i.get_name() == 'linear':
-                i.set_weights(np.random.normal(0,0.02,i.get_weights().shape))
-                i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+        
+        if init_type == 'normal':
+            for i in self.stack:
+                if i.get_name() == 'conv2d':
+                    i.set_weights(np.random.normal(0,0.02,i.get_weights().shape))
+                    i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+                if i.get_name() == 'bn':
+                    i.set_weights(np.random.normal(1,0.02,i.get_weights().shape))
+                    i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+                if i.get_name() == 'linear':
+                    i.set_weights(np.random.normal(0,0.02,i.get_weights().shape))
+                    i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+        if init_type == 'xavier':
+              for i in self.stack:
+                if i.get_name() == 'conv2d':
+                    i.set_weights(np.random.uniform(-math.sqrt(6/(i.input_channel+i.output_channel)),math.sqrt(6/(i.input_channel+i.output_channel)),i.get_weights().shape))
+                    i.set_bias(np.random.uniform(-math.sqrt(6/(i.input_channel+i.output_channel)),math.sqrt(6/(i.input_channel+i.output_channel)),i.get_bias().shape))
+                if i.get_name() == 'bn':
+                    i.set_weights(np.random.normal(1,0.02,i.get_weights().shape))
+                    i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+                if i.get_name() == 'linear':
+                    i.set_weights(np.random.uniform(-math.sqrt(6/(i.input_channel+i.output_channel)),math.sqrt(6/(i.input_channel+i.output_channel)),i.get_weights().shape))
+                    i.set_bias(np.random.uniform(-math.sqrt(6/(i.input_channel+i.output_channel)),math.sqrt(6/(i.input_channel+i.output_channel)),i.get_bias().shape))   
+        if init_type == 'kaiming':
+              for i in self.stack:
+                if i.get_name() == 'conv2d':
+                    i.set_weights(np.random.normal(0,math.sqrt(1/i.input_channel),i.get_weights().shape))
+                    i.set_bias(np.random.normal(0,math.sqrt(1/i.input_channel),i.get_bias().shape))
+                if i.get_name() == 'bn':
+                    i.set_weights(np.random.normal(1,0.02,i.get_weights().shape))
+                    i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+                if i.get_name() == 'linear':
+                    i.set_weights(np.random.normal(0,math.sqrt(1/i.input_channel),i.get_weights().shape))
+                    i.set_bias(np.random.normal(0,math.sqrt(1/i.input_channel),i.get_bias().shape))
+        
 
     def backward_stack(self):
         if not self.stack:

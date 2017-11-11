@@ -10,13 +10,14 @@ a toy neural network based on python
     - [ ] pooling
     - [x] relu
     - [x] linear
+    - [x] dropout (testing)
     
 * loss:
     - [x] L1/L2
     - [x] cross entropy
 * init:
-    - [ ] Xavier
-    - [ ] Kaiming
+    - [x] Xavier
+    - [x] Kaiming
     - [x] normal
      
 * optimizer:
@@ -70,5 +71,9 @@ I will find someway else for more complex network structure.
 # some results
 
 default network structure(as shown above) validates on MNIST test set.
+
+|network| loss | accuracy|
+|---|----|----|
+| simple | -- | 88%|
 
 ![accuracy](https://github.com/vinthony/rem.py/blob/master/assets/default.png)
