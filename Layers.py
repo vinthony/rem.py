@@ -294,12 +294,60 @@ class BN(Layer):
 
 
 class Maxpool(Layer):
-    def __init__(self):
+    def __init__(self,kernel,stride,padding):
+        super(Maxpool,self).__init__()
         self.type = 'maxpool'
+        self.kernel = kernel
+        self.stride = stride
+        self.padding = padding
+        
+    def forward(self,input_data):
+        bs,ch,h,w = input_data.shape
+        
+        self.input = input_data
+        self.output_x = (w + 2*self.padding[0] - self.kernel[0] )//self.stride[0] + 1;
+        self.output_y = (h + 2*self.padding[1] - self.kernel[1] )//self.stride[1] + 1;
+         
+        #bs x ic*k*k x oy*ox
+        self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )     
+        self.imcol_all = np.reshape(im2col(input_data,self.kernel,self.stride,self.padding),(bs,ch,self.kernel[0]*self.kernel[1],self.output_x*self.output_y))
+        
+        # bs,op,
+        self.output = np.max(self.imcol_all,3)
+        
+        return self.output
+    
+    def backward(self):
+        pass
+    
 
 class Averagepool(Layer):
-    def __init__(self):
-        self.type = 'averagepool'
+    def __init__(self,kernel,stride,padding):
+        super(Averagepool,self).__init__()
+        self.type = 'avepool'
+        self.kernel = kernel
+        self.stride = stride
+        self.padding = padding
+        
+    def forward(self,input_data):
+        bs,ch,h,w = input_data.shape
+        
+        self.input = input_data
+        self.output_x = (w + 2*self.padding[0] - self.kernel[0] )//self.stride[0] + 1;
+        self.output_y = (h + 2*self.padding[1] - self.kernel[1] )//self.stride[1] + 1;
+         
+        #bs x ic*k*k x oy*ox
+        self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )     
+        self.imcol_all = np.reshape(im2col(input_data,self.kernel,self.stride,self.padding),(bs,ch,self.kernel[0]*self.kernel[1],self.output_x*self.output_y))
+        
+        # bs,op,
+        self.output = np.mean(self.imcol_all,3);
+        
+        return self.output
+    
+    def backward(self,input_data,grad_from_back):
+       
+       pass
 
 class Dropout(Layer):
     def __init__(self,prob,**kwags):

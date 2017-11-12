@@ -7,7 +7,7 @@ a toy neural network based on python
 * layers:
     - [x] Conv2d (need checking)
     - [x] Batch normalization (need checking)
-    - [ ] pooling
+    - [x] pooling (need add background)
     - [x] relu
     - [x] linear
     - [x] dropout (testing)
@@ -72,8 +72,9 @@ I will find someway else for more complex network structure.
 
 default network structure(as shown above) validates on MNIST test set.
 
-|network| loss | accuracy|
+|network| iteration | accuracy|
 |---|----|----|
-| simple | -- | 88%|
+| simple(sgd) | 10000(~20epochs) | 85%|
+| simple(adam) | 10000(~20epochs) |   |
 
 ![accuracy](https://github.com/vinthony/rem.py/blob/master/assets/default.png)

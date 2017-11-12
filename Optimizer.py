@@ -55,10 +55,10 @@ class Optimizer(object):
                 bc1 = 1 - self.beta1**self.t
                 bc2 = 1 - self.beta2**self.t
                 
-                ss = math.sqrt(bc2)/bc1 
+                ss = - self.lr * math.sqrt(bc2)/bc1 
                
-                w = w - layer.m*layer.denom*ss
-                b = b - layer.mb*layer.denomb*ss
+                w = w + layer.m/layer.denom*ss 
+                b = b + layer.mb/layer.denomb*ss
                 
                 layer.set_weights(w)
                 layer.set_bias(b)

@@ -61,7 +61,15 @@ class Model(object):
             if isinstance(obj, Layer):
                 self.stack.append(obj);
                
-            
+    def getParametersOfModel(self):
+        self.model_size = 0
+        if not self.stack:
+            self.init_stack()
+        for i in self.stack:
+            if i.get_name() == 'conv2d' or i.get_name() == 'linear' or i.get_name() == 'bn':
+                self.model_size = self.model_size + i.get_weights().size + i.get_bias().size
+                
+        return self.model_size
                 
     def foward_stack(self):
         if not self.stack:

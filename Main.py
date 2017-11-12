@@ -6,7 +6,7 @@ This is a temporary script file.
 """
 
 import numpy as np
-
+import time
 from Models import Model
 
 from Optimizer import Optimizer
@@ -137,6 +137,9 @@ if __name__ == '__main__':
 
     criterion = CrossEntropy()
     
+    begin = time.time()
+    best_acc = 0  
+    
     for i in range(iteration):
         
         input_image, label = _iter.__next__() # 2.7 )_iter.next() / 3.6 : _iter.__next__()
@@ -165,4 +168,7 @@ if __name__ == '__main__':
                 vlabel = getMatrixOfClass(vlabel)
                 vxlabel = network(np.reshape(valid_image,(-1,28*28)))   
                 count = count + accuracy(vxlabel,vlabel)
+            if count/10000 > best_acc: best_acc = count/10000
             print("iter:{},loss:{}, accuracy:{}".format(i,loss,count/10000))
+            
+    print("total time:{}, best accuracy:{}, model paramaters:{}".format(time.time()-begin,best_acc,network.getParametersOfModel()))
