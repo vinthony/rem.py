@@ -5,8 +5,8 @@ a toy neural network based on python
 # todo
 
 * layers:
-    - [ ] Conv2d
-    - [ ] Batch normalization
+    - [x] Conv2d (need checking)
+    - [x] Batch normalization (need checking)
     - [ ] pooling
     - [x] relu
     - [x] linear
@@ -21,7 +21,7 @@ a toy neural network based on python
     - [x] normal
      
 * optimizer:
-    - [ ] adam
+    - [x] adam
     - [ ] rmsprop
     - [x] sgd
     

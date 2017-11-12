@@ -28,17 +28,33 @@ class NetworkWithDropout(Model):
     def forward(self,input_data):
         op = self.linear3(self.dropout2(self.relu2(self.linear2(self.dropout1(self.relu1(self.linear1(input_data)))))))
         return op
-    
+
+class NetworkKeras(Model):
+    def __init__(self):
+        super(NetworkKeras,self).__init__()
+        self.linear1 = Linear(28*28,512);
+        self.linear2 = Linear(512,512);
+        self.linear3 = Linear(512,10);
+        self.dropout1 = Dropout(0.2)
+        self.dropout2 = Dropout(0.2)
+        self.relu1 = NonLinear(subtype='relu')
+        self.relu2 = NonLinear(subtype='relu')
+        
+    def forward(self,input_data):
+        op = self.linear3(self.dropout2(self.relu2(self.linear2(self.dropout1(self.relu1(self.linear1(input_data)))))))
+        return op
+
 class Network(Model):
     def __init__(self):
         super(Network,self).__init__()
         self.linear1 = Linear(28*28,14*14);
         self.linear2 = Linear(14*14,7*7);
         self.linear3 = Linear(7*7,10);
-        self.relu = NonLinear(subtype='relu')
+        self.relu1 = NonLinear(subtype='relu')
+        self.relu2 = NonLinear(subtype='relu')
         
     def forward(self,input_data):
-        op = self.linear3(self.relu(self.linear2(self.relu(self.linear1(input_data)))))
+        op = self.linear3(self.relu1(self.linear2(self.relu2(self.linear1(input_data)))))
         return op
     
 class NetworkWithBN(Model):
@@ -64,7 +80,7 @@ class CNN(Model):
     def __init__(self):
         super(CNN,self).__init__()
         self.conv1 = Conv2d(1,32,[3,3],[2,2],[1,1]); # 28x28 -> 32 x 14 x 14
-        self.conv2 = Conv2d(32,32,[3,3],[2,2],[1,1]); # 32 x 7 x 7
+        self.conv2 = Conv2d(32,32,[3,3],[2,2],[1,1]); # 32x14x14 -> 32 x 7 x 7
         self.conv3 = Conv2d(32,32,[3,3],[2,2],[1,1]); # 32 x 4 x 4
         # self.bn1 = BN(32)
         # self.bn2 = BN(32)
@@ -86,8 +102,8 @@ class CNN(Model):
 
 if __name__ == '__main__':
 
-    iteration = 120000
-    batch_size = 256
+    iteration = 10000 # ~20epochs
+    batch_size = 128
     save_iter = 1000
     validate_iter = 20
     disp_iter = 5
@@ -99,18 +115,19 @@ if __name__ == '__main__':
     
     model_path = 'iteration_20.json'
     
+    #adam
     parameters = {
                 "lr":0.001,
                 "beta1":0.9,
                 "beta2":0.999,
             }
-    init_type = 'xavier' # console4:kaiming
+    init_type = 'normal' # console4:kaiming
      
     _iter = data_loader(traing_samples,traing_labels,batch_size)
     
     _validate = data_loader(test_samples,test_labels,1)
     
-    network = NetworkWithDropout()
+    network = Network()
     #network = Model().load(model_path)
     network.init(init_type)
     
@@ -126,7 +143,7 @@ if __name__ == '__main__':
 
         label = getMatrixOfClass(label)
 
-        xlabel = network(np.reshape(input_image,(-1,1,28,28)))
+        xlabel = network(np.reshape(input_image,(-1,28*28)))
         
         loss = criterion(xlabel,label)
 
@@ -138,7 +155,7 @@ if __name__ == '__main__':
         
     
         if i % save_iter == 0:
-            save_model("iteration_{}_{}.json".format(i,init_type),network)
+            save_model("checkpoints/iteration_n_{}_{}.json".format(i,init_type),network)
             
         if (i+1) % validate_iter == 0:
             # 10000
@@ -146,6 +163,6 @@ if __name__ == '__main__':
             for j in range(10000):
                 valid_image, vlabel = _validate.__next__()
                 vlabel = getMatrixOfClass(vlabel)
-                vxlabel = network(np.reshape(valid_image,(-1,1,28,28)))   
+                vxlabel = network(np.reshape(valid_image,(-1,28*28)))   
                 count = count + accuracy(vxlabel,vlabel)
             print("iter:{},loss:{}, accuracy:{}".format(i,loss,count/10000))

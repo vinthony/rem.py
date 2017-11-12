@@ -97,6 +97,7 @@ ENV/
 
 # mypy
 .mypy_cache/
+checkpoints/
 *.json
 *.idx3-ubyte
 *.idx1-ubyte

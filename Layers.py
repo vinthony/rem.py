@@ -26,6 +26,11 @@ class Layer(object):
         self.type = 'Layer'
         self.callid = None
         
+        self.m = np.array([])
+        self.v = np.array([])
+        self.mb = np.array([])
+        self.vb = np.array([])
+        
     def __call__(self,data):
         if self.callid == None:
             self.callid = Layer.counter
@@ -113,46 +118,58 @@ class Conv2d(Layer):
         
     def forward(self, input_data):
         # bs x ch x w x h
-       # t = time.time()
+        #t = time.time()
         bs,ch,h,w = input_data.shape
         
         self.input = input_data
         self.output_x = (w + 2*self.padding[0] - self.kernel[0] )//self.stride[0] + 1;
         self.output_y = (h + 2*self.padding[1] - self.kernel[1] )//self.stride[1] + 1;
         
-        self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )    
-        self.imcol_all = np.zeros( (bs,ch*self.kernel[0]*self.kernel[1],self.output_x*self.output_y) )    
+        self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )     
+        self.imcol_all = im2col(input_data,self.kernel,self.stride,self.padding)
+        bs_bais = np.tile(np.reshape(self.bias,[1,self.output_channel,1]),(bs,1,self.output_x*self.output_y));
+        # bs x oc x ic*k*k x oy*ox
+#        print(np.repeat(np.expand_dims(self.imcol_all,axis=1) ,self.output_channel,axis=1).shape,np.tile(np.reshape(self.weight,[1,self.output_channel,-1,1]),(bs,1,1,self.output_x*self.output_y)).shape,bs_bais.shape)
+        self.output = np.sum(np.repeat(np.expand_dims(self.imcol_all,axis=1) ,self.output_channel,axis=1) *  np.tile(np.reshape(self.weight,[1,self.output_channel,-1,1]),(bs,1,1,self.output_x*self.output_y)) , axis=2) + bs_bais;
         
-        for i in range(bs):
-            for j in range(ch):
-                self.imcol_all[i,j:j+self.kernel[0]*self.kernel[1],:] = im2col(input_data[i,j,:,:],self.kernel,self.stride,self.padding)
-            for oc in range(self.output_channel):
-                self.output[i,oc,:,:] = np.reshape(np.sum(self.imcol_all[i] * np.repeat(np.reshape(self.weight[oc],[-1,1]),self.output_x*self.output_y,axis=1),axis=0) + np.repeat(self.bias[oc],self.output_x*self.output_y),(self.output_y,self.output_x))
-       # print('forward',time.time()-t,self.callid)
+        self.output = np.reshape(self.output,(bs,self.output_channel,self.output_y,self.output_x))
+        
+        #print('forward',time.time()-t,self.callid)
         return self.output
     
     def backward(self, input_data, grad_from_back):
-       # t = time.time()
+        t = time.time()
         bs,ch,h,w = input_data.shape
+        bs,oc,oh,ow = grad_from_back.shape
+        
+        #print(input_data.shape,grad_from_back.shape)
         if grad_from_back.ndim < 4:
             grad_from_back = np.reshape(grad_from_back, (bs,self.output_channel,self.output_y,self.output_x) )
 
         self.bias_grad = np.sum(np.sum(np.sum(grad_from_back,axis=3),axis=2),axis=0)
         self.transposed_weight = np.rot90(self.weight,k=2,axes=(2,3))  # rotate 180 for derivate
         self.grad_input = np.zeros((bs,ch,h,w))
-        # bs ch h w *k1*k2
-        for ch in range(self.output_channel):
-            # k1*k2*ch
-            self.weight_grad[ch] = np.reshape(np.sum(np.sum(self.imcol_all * np.repeat( np.reshape(grad_from_back[:,ch:ch+1,:,:],(bs,1,-1)),
-                self.kernel[0]*self.kernel[1]*self.input_channel,axis=1),axis=2),axis=0),(self.input_channel,self.kernel[0],self.kernel[1]))
-
-        self.imcol_grad_all = np.zeros( (bs,self.output_channel,self.kernel[0]*self.kernel[1],h*w) )     
         
-        for i in range(bs):
-            for j in range(self.output_channel):
-                self.imcol_grad_all[i,j,:,:] = imremap(grad_from_back[i,j,:,:],h,w,self.kernel,self.stride,self.padding)
-            for ic in range(self.input_channel):
-                self.grad_input[i,ic,:,:] = np.reshape(np.sum( np.reshape(self.imcol_grad_all[i],(self.output_channel*self.kernel[0]*self.kernel[1],h*w)) * np.repeat(np.reshape(self.transposed_weight[:,ic,:,:],[-1,1]),h*w,axis=1),axis=0),(h,w))
+        # bs x oc x ich*k*k x oy*ox
+        imcolxx = np.repeat(np.expand_dims(self.imcol_all,axis=1) ,self.output_channel,axis=1)
+        gradxx = np.tile(np.expand_dims(np.reshape(grad_from_back,(bs,oc,oh*ow)),axis=2),(1,1,ch*self.kernel[0]*self.kernel[1],1))
+        
+        self.weight_grad = np.reshape(np.sum(np.sum(imcolxx * gradxx,axis=3),axis=0),self.weight.shape);
+        
+        # bs x oc x oy x ox
+        # bs x  oc*k*k x h*w
+        self.imcol_grad_all = imremap(grad_from_back,h,w,self.kernel,self.stride,self.padding)     
+        
+        #print(grad_from_back.shape,self.imcol_grad_all.shape,self.input_channel)
+        # ic * oc * k * k 
+        extend_transpose_weight = np.tile(np.reshape(self.transposed_weight,[1,self.input_channel,-1,1]),(bs,1,1,h*w))
+        
+#       
+        # bs x ic x oc*k*k x h * w;
+        self.grad_input = np.mean(np.repeat(np.expand_dims(self.imcol_grad_all,axis=1) ,self.input_channel,axis=1) * extend_transpose_weight, axis=2)
+        
+        self.grad_input = np.reshape(self.grad_input,(bs,self.input_channel,h,w))
+        
         #print('backward',time.time()-t,self.callid)
         return self.grad_input
 
