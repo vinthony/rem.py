@@ -8,7 +8,6 @@ Created on Fri Nov  3 00:17:08 2017
 import time
 import numpy as np
 import json
-import uuid
 
 def static_vars(**kwargs):
     def decorate(func):
@@ -18,7 +17,7 @@ def static_vars(**kwargs):
     return decorate
 
 
-from utils import im2col,imremap
+from utils import im2col
 
 class Layer(object):
     counter = 0
@@ -134,50 +133,50 @@ class Conv2d(Layer):
         
         self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )     
         self.imcol_all = im2col(input_data,self.kernel,self.stride,self.padding)
-        bs_bais = np.tile(np.reshape(self.bias,[1,self.output_channel,1]),(bs,1,self.output_x*self.output_y));
-        # bs x oc x ic*k*k x oy*ox
-#        print(np.repeat(np.expand_dims(self.imcol_all,axis=1) ,self.output_channel,axis=1).shape,np.tile(np.reshape(self.weight,[1,self.output_channel,-1,1]),(bs,1,1,self.output_x*self.output_y)).shape,bs_bais.shape)
-        self.output = np.sum(np.repeat(np.expand_dims(self.imcol_all,axis=1) ,self.output_channel,axis=1) *  np.tile(np.reshape(self.weight,[1,self.output_channel,-1,1]),(bs,1,1,self.output_x*self.output_y)) , axis=2) + bs_bais;
         
-        self.output = np.reshape(self.output,(bs,self.output_channel,self.output_y,self.output_x))
+        #(oc,1)
+        bs_bais = np.reshape(self.bias,[self.output_channel,1])
         
-        #print('forward',time.time()-t,self.callid)
+        # (oc , ic*k*k) x (ic*k*k, x*y) 
+        bs_weight = np.reshape(self.weight,[self.output_channel,-1]);
+        
+        for i in range(bs):
+            self.output[i,:,:,:] = np.reshape(np.dot(bs_weight,self.imcol_all[i]) + bs_bais,(self.output_channel,self.output_y,self.output_x))
+
         return self.output
     
     def backward(self, input_data, grad_from_back):
         t = time.time()
         bs,ch,h,w = input_data.shape
         bs,oc,oh,ow = grad_from_back.shape
-        
-        #print(input_data.shape,grad_from_back.shape)
+        self.weight_grad.fill(0.0)
+        self.grad_input = np.zeros(input_data.shape)
+      
         if grad_from_back.ndim < 4:
             grad_from_back = np.reshape(grad_from_back, (bs,self.output_channel,self.output_y,self.output_x) )
 
         self.bias_grad = np.sum(np.sum(np.sum(grad_from_back,axis=3),axis=2),axis=0)
         self.transposed_weight = np.rot90(self.weight,k=2,axes=(2,3))  # rotate 180 for derivate
-        self.grad_input = np.zeros((bs,ch,h,w))
         
-        # bs x oc x ich*k*k x oy*ox
-        imcolxx = np.repeat(np.expand_dims(self.imcol_all,axis=1) ,self.output_channel,axis=1)
-        gradxx = np.tile(np.expand_dims(np.reshape(grad_from_back,(bs,oc,oh*ow)),axis=2),(1,1,ch*self.kernel[0]*self.kernel[1],1))
+        #(bs, x*y, ic*k*k)
+        trans_imcol = np.transpose(self.imcol_all,(0,2,1))
+       # (bs, oc , oy*ox)
+        for i in range(bs):
+            self.weight_grad += np.reshape(np.dot(np.reshape(grad_from_back[i],(oc,oh*ow)),trans_imcol[i]),(oc,ch,self.kernel[0],self.kernel[1]))
         
-        self.weight_grad = np.reshape(np.sum(np.sum(imcolxx * gradxx,axis=3),axis=0),self.weight.shape);
-        
-        # bs x oc x oy x ox
+        self.weight_grad = self.weight_grad/bs;
+                
+        adjh = h - ((oh-1)*self.stride[0] - 2*self.padding[0] + self.kernel[0]) 
+        adjw = w - ((ow-1)*self.stride[1] - 2*self.padding[1] + self.kernel[1]) 
         # bs x  oc*k*k x h*w
-        self.imcol_grad_all = imremap(grad_from_back,h,w,self.kernel,self.stride,self.padding)     
-        
-        #print(grad_from_back.shape,self.imcol_grad_all.shape,self.input_channel)
+        self.imcol_grad_all = im2col(grad_from_back,self.kernel,self.stride,self.padding,False,adjh,adjw)     
         # ic * oc * k * k 
-        extend_transpose_weight = np.tile(np.reshape(self.transposed_weight,[1,self.input_channel,-1,1]),(bs,1,1,h*w))
-        
-#       
-        # bs x ic x oc*k*k x h * w;
-        self.grad_input = np.mean(np.repeat(np.expand_dims(self.imcol_grad_all,axis=1) ,self.input_channel,axis=1) * extend_transpose_weight, axis=2)
-        
-        self.grad_input = np.reshape(self.grad_input,(bs,self.input_channel,h,w))
-        
-        #print('backward',time.time()-t,self.callid)
+        extend_transpose_weight =  np.reshape(np.transpose(self.transposed_weight,(1,0,2,3)),[self.input_channel,-1])
+    
+        for i in range(bs):
+            #  ic * oc * k * k , oc*k*k x h*w
+            self.grad_input[i] = np.reshape(np.dot( np.reshape(extend_transpose_weight,[ch,-1]),self.imcol_grad_all[i]),(ch,h,w))
+       
         return self.grad_input
 
 
