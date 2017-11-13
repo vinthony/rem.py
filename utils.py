@@ -43,7 +43,7 @@ def data_loader(image,label,batch_size):
             
             #print(np.max(batch_image),np.min(batch_image))
             #normalize
-            #batch_image = (images[batch_idx:batch_idx+batch_size]/255 ) *2 - 1
+            batch_image = (images[batch_idx:batch_idx+batch_size]/255 )
         
             yield batch_image,batch_label
             

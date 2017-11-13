@@ -10,7 +10,7 @@ a toy neural network based on python
     - [x] pooling (need add background)
     - [x] relu
     - [x] linear
-    - [x] dropout (testing)
+    - [x] dropout (something wrong in dropout)
     
 * loss:
     - [x] L1/L2
@@ -72,9 +72,9 @@ I will find someway else for more complex network structure.
 
 default network structure(as shown above) validates on MNIST test set.
 
-|network| iteration | accuracy|
+|network| iteration | time | accuracy|
 |---|----|----|
-| simple(sgd) | 10000(~20epochs) | 85%|
-| simple(adam) | 10000(~20epochs) |   |
+| simple(sgd) | -- | 10000(~20epochs) | 85%|
+| simple(adam) | 4768s |10000(~20epochs) |  97.32% |
 
 ![accuracy](https://github.com/vinthony/rem.py/blob/master/assets/default.png)

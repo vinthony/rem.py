@@ -23,8 +23,9 @@ class CrossEntropy(Criterion):
         
     def forward(self,input_data,target_data):
         # bs x 10
+        input_data = input_data - np.expand_dims(np.max(input_data,axis=1),axis=1)
         ee = np.exp(input_data) 
-        sf = ee / np.sum(ee,axis=1).reshape((-1,1))
+        sf = ee / (np.sum(ee,axis=1).reshape((-1,1))+self.eps)
 
         self.softmax = sf;
         

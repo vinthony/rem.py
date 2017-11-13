@@ -8,6 +8,7 @@ This is a temporary script file.
 import numpy as np
 import time
 from Models import Model
+import logging
 
 from Optimizer import Optimizer
 from Criterions import CrossEntropy
@@ -104,17 +105,23 @@ if __name__ == '__main__':
 
     iteration = 10000 # ~20epochs
     batch_size = 128
-    save_iter = 1000
+    save_iter = 50
     validate_iter = 20
     disp_iter = 5
     
-    traing_samples = 'train-images.idx3-ubyte' 
-    traing_labels = 'train-labels.idx1-ubyte'
-    test_samples = 't10k-images.idx3-ubyte'
-    test_labels = 't10k-labels.idx1-ubyte'
+    traing_samples = 'dataset/train-images.idx3-ubyte' 
+    traing_labels = 'dataset/train-labels.idx1-ubyte'
+    test_samples = 'dataset/t10k-images.idx3-ubyte'
+    test_labels = 'dataset/t10k-labels.idx1-ubyte'
     
     model_path = 'iteration_20.json'
+
+    name = time.time()
+
+    logging.basicConfig(filename='checkpoints/{}.log'.format(name),level=logging.INFO)
     
+    input_shape = (-1,1,28,28)
+
     #adam
     parameters = {
                 "lr":0.001,
@@ -131,7 +138,6 @@ if __name__ == '__main__':
     #network = Model().load(model_path)
     network.init(init_type)
     
-    print('init complete')
    
     optimizer = Optimizer(parameters)
 
@@ -139,6 +145,8 @@ if __name__ == '__main__':
     
     begin = time.time()
     best_acc = 0  
+
+    logging.info('[{}][network:{}][optimizer:{}][learningRate:{}]'.format(name,network.__class__.__name__,'Adam',parameters['lr']))
     
     for i in range(iteration):
         
@@ -146,8 +154,8 @@ if __name__ == '__main__':
 
         label = getMatrixOfClass(label)
 
-        xlabel = network(np.reshape(input_image,(-1,28*28)))
-        
+        xlabel = network(np.reshape(input_image,input_shape))
+
         loss = criterion(xlabel,label)
 
         d_loss_network = criterion.backward(xlabel,label)
@@ -156,19 +164,21 @@ if __name__ == '__main__':
         
         optimizer(parameters)
         
-    
         if i % save_iter == 0:
             save_model("checkpoints/iteration_n_{}_{}.json".format(i,init_type),network)
             
         if (i+1) % validate_iter == 0:
+            network.evaluate()
+            print('start evaluate')
             # 10000
             count = 0
             for j in range(10000):
                 valid_image, vlabel = _validate.__next__()
                 vlabel = getMatrixOfClass(vlabel)
-                vxlabel = network(np.reshape(valid_image,(-1,28*28)))   
+                vxlabel = network(np.reshape(valid_image,input_shape))   
                 count = count + accuracy(vxlabel,vlabel)
-            if count/10000 > best_acc: best_acc = count/10000
-            print("iter:{},loss:{}, accuracy:{}".format(i,loss,count/10000))
-            
-    print("total time:{}, best accuracy:{}, model paramaters:{}".format(time.time()-begin,best_acc,network.getParametersOfModel()))
+            if count/10000*100 > best_acc: best_acc = count/10000*100
+            logging.info("iter:{},loss:{:.2f}, accuracy:{:.2f}%".format(i,loss,count/10000*100))
+            network.train()
+
+    logging.info("total time:{:.2f}h, best accuracy:{:.2f}%, model paramaters:{}".format((time.time()-begin)/3600,best_acc,network.getParametersOfModel()))

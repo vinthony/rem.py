@@ -22,9 +22,11 @@ from utils import im2col,imremap
 
 class Layer(object):
     counter = 0
+    register_id = 0
     def __init__(self,callid=None):
         self.type = 'Layer'
         self.callid = None
+        self.register_id = None
         
         self.m = np.array([])
         self.v = np.array([])
@@ -32,13 +34,18 @@ class Layer(object):
         self.vb = np.array([])
         
     def __call__(self,data):
+
         if self.callid == None:
             self.callid = Layer.counter
             Layer.counter = Layer.counter + 1
-       
+        
         return self.forward(data)
        
-    
+    def register(self):
+        if self.register_id == None:
+            self.register_id = Layer.register_id
+            Layer.register_id = Layer.register_id + 1
+
     def __repr__(self):
         dic  = {}
         for k,v in self.__dict__.items():
@@ -352,24 +359,32 @@ class Averagepool(Layer):
 class Dropout(Layer):
     def __init__(self,prob,**kwags):
         super(Dropout,self).__init__(**kwags)
+        self.type = 'dropout'
         self.prob = prob
+        self.isTrain = True
     
     def forward(self,input_data):
         self.input = input_data
-        self.saved = 1.0 - self.prob
-        self.sample = np.random.binomial(n=1,p=self.saved,size=input_data.shape)
-        
-        input_data = input_data * self.sample
-        
-        self.output = input_data / self.saved
-        
+        if self.isTrain == True: 
+            self.saved = 1.0 - self.prob 
+            self.sample = np.random.binomial(n=1,p=self.saved,size=input_data.shape)
+            input_data = input_data * self.sample
+            self.output = input_data / self.saved
+        else:
+            self.output = self.input
         return self.output
     
     def backward(self,input_data,grad_from_back):
-        
+
         self.grad_input = grad_from_back / self.saved * self.sample
         
         return self.grad_input
+
+    def train(self):
+        self.isTrain = True
+
+    def evaluate(self):
+        self.isTrain = False
     
 
 class Linear(Layer):
