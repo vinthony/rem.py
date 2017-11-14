@@ -13,7 +13,7 @@ import logging
 from Optimizer import Optimizer
 from Criterions import CrossEntropy
 from utils import getMatrixOfClass,save_model,data_loader,accuracy   
-from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool,Dropout
+from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool,Dropout,SpatialBN
 
 class NetworkWithDropout(Model):
     def __init__(self):
@@ -83,10 +83,9 @@ class CNN(Model):
         self.conv1 = Conv2d(1,32,[3,3],[2,2],[1,1]); # 28x28 -> 32 x 14 x 14
         self.conv2 = Conv2d(32,32,[3,3],[2,2],[1,1]); # 32x14x14 -> 32 x 7 x 7
         self.conv3 = Conv2d(32,32,[3,3],[2,2],[1,1]); # 32 x 4 x 4
-        # self.bn1 = BN(32)
-        # self.bn2 = BN(32)
-        # self.bn3 = BN(64)
-        # self.bn4 = BN(64)
+#        self.bn1 = SpatialBN(32)
+#        self.bn2 = SpatialBN(32)
+#        self.bn3 = SpatialBN(32)
         # self.bn5 = BN(128)
         self.linear1 = Linear(512,49);
         self.linear2 = Linear(49,10); # 
@@ -96,8 +95,11 @@ class CNN(Model):
         self.relu4 = NonLinear(subtype='relu')
         
     def forward(self,input_data):
-        op1 = self.linear2(self.relu4(self.linear1(self.relu3(self.conv3(self.relu2(self.conv2(self.relu1(self.conv1(input_data)))))))))
-        return op1
+        op1 = self.relu1(self.conv1(input_data));
+        op2 = self.relu2(self.conv2(op1));
+        op3 = self.linear1(self.relu3(self.conv3(op2)));
+        op4 = self.linear2(self.relu4(op3))
+        return op4
  
  
 
@@ -128,7 +130,7 @@ if __name__ == '__main__':
                 "beta1":0.9,
                 "beta2":0.999,
             }
-    init_type = 'normal' # console4:kaiming
+    init_type = 'kaiming' # console4:kaiming
      
     _iter = data_loader(traing_samples,traing_labels,batch_size)
     

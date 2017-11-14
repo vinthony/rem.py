@@ -8,15 +8,6 @@ Created on Fri Nov  3 00:17:08 2017
 import time
 import numpy as np
 import json
-
-def static_vars(**kwargs):
-    def decorate(func):
-        for k in kwargs:
-            setattr(func, k, kwargs[k])
-        return func
-    return decorate
-
-
 from utils import im2col,col2im
 
 class Layer(object):
@@ -33,11 +24,10 @@ class Layer(object):
         self.vb = np.array([])
         
     def __call__(self,data):
-
         if self.callid == None:
             self.callid = Layer.counter
             Layer.counter = Layer.counter + 1
-        
+        self.input = data
         return self.forward(data)
        
     def register(self):
@@ -62,11 +52,11 @@ class Layer(object):
 
     def forward(self, input_data):
         # forward pass
-        return self
+        return self.output
         
     def backward(self, input_data, grad_from_back):
         # backward pass
-        return self
+        return self.grad_input
     
     def get_weights(self):
         return self.weight
@@ -165,7 +155,7 @@ class Conv2d(Layer):
         
         #(bs, x*y, ic*k*k)
         trans_imcol = np.transpose(self.imcol_all,(0,2,1))
-       # (bs, oc , oy*ox)
+        # (bs, oc , oy*ox)
         for i in range(bs):
             self.weight_grad += np.reshape(np.dot(np.reshape(grad_from_back[i],(oc,oh*ow)),trans_imcol[i]),(oc,ch,self.kernel[0],self.kernel[1]))
         
@@ -174,10 +164,10 @@ class Conv2d(Layer):
         d_col = np.zeros((bs,self.input_channel*self.kernel[0]*self.kernel[1],oh*ow))
         
         for i in range(bs):
-            d_col[i] = np.dot(np.reshape(self.weight,(self.output_channel,-1)).T,np.reshape(grad_from_back[i],(oc,-1)))
+            d_col[i] = np.dot(np.reshape(self.weight,(oc,-1)).T,np.reshape(grad_from_back[i],(oc,-1)))
 
         # reshape the d_col to image. d_col[bs,ic*k*k,oh*ow]
-        self.output = col2im(d_col,input_data.shape,self.kernel,self.stride,self.padding)
+        self.grad_input = col2im(d_col,input_data.shape,self.kernel,self.stride,self.padding)
 
         return self.grad_input
 
@@ -194,8 +184,8 @@ class SpatialBN(Layer):
 
     def forward(self,input_data):
 
-        bs,c,h,w = self.input_data.shape
-
+        bs,c,h,w = input_data.shape
+        self.input = input_data
         # mean [batch,ch,h,w]
         self.m = np.mean(input_data,axis=0,keepdims=True)
         # variance
@@ -206,19 +196,19 @@ class SpatialBN(Layer):
         self.x_hat = (input_data - np.repeat(self.m,bs,axis=0) ) / (np.repeat(self.sqrt_v,bs,axis=0) )
         
         # bs x ch x h x w
-        self.output = self.x_hat * np.repeat(self.weight,[bs,1,h,w]) + np.repeat(self.bias,[bs,1,h,w])
+        self.output = self.x_hat *  np.reshape(self.weight,(1,self.channel,1,1)) + np.reshape(self.bias,(1,self.channel,1,1))
 
         return self.output
 
     def backward(self,input_data,grad_from_back):
         
-        bs,c,h,w = self.input_data.shape
+        bs,c,h,w =  input_data.shape
 
         self.bias_grad = np.sum(np.sum(np.sum(grad_from_back,axis=3),axis=2),axis=0)
         
         self.weight_grad = np.sum(np.sum(np.sum(self.x_hat*grad_from_back,axis=3),axis=2),axis=0)
         
-        d_hat = np.repeat(self.weight,[bs,1,h,w]) * grad_from_back
+        d_hat = np.reshape(self.weight,(1,self.channel,1,1)) * grad_from_back
         
         d_sqrt_var = - 1. / (self.sqrt_v**2) * d_hat
         # bs x c x h x w
@@ -234,7 +224,8 @@ class SpatialBN(Layer):
         
         d_u = -1 * np.sum(d_mv,axis=0)
         
-        d_x2 = np.ones((bs,c,w,h))/bs * np.repeat(d_u,(bs,1,1,1))
+
+        d_x2 = np.ones((bs,c,w,h))/bs * np.expand_dims(d_u,axis=0)
         
         self.grad_input = d_x2 + d_mv
     
@@ -278,6 +269,7 @@ class BN(Layer):
         
         self.weight_grad = np.sum(self.x_hat*grad_from_back,axis=0)
         
+        #bs x channel
         d_hat = np.repeat(np.reshape(self.weight,(1,-1)),bs,axis=0) * grad_from_back
         
         d_sqrt_var = - 1. / (self.sqrt_v**2) * d_hat

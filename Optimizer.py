@@ -27,7 +27,7 @@ class Optimizer(object):
         if not self.stack:
             self.init_stack()
         for layer in self.stack:
-            if layer.type == 'conv' or layer.type == 'bn' or layer.type == 'linear':
+            if layer.type == 'conv2d' or layer.type == 'bn' or layer.type == 'linear':
                 
                 if layer.m.shape:
                     layer.m = np.zeros(layer.get_weights_grad().shape)
