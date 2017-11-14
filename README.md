@@ -5,7 +5,7 @@ a toy neural network based on python
 # todo
 
 * layers:
-    - [x] Conv2d (need checking)
+    - [x] Conv2d
     - [x] Batch normalization (need checking)
     - [x] pooling (need add background)
     - [x] relu

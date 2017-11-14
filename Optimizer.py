@@ -29,7 +29,7 @@ class Optimizer(object):
         for layer in self.stack:
             if layer.type == 'conv2d' or layer.type == 'bn' or layer.type == 'linear':
                 
-                if layer.m.shape:
+                if layer.m.shape == np.array([]).shape:
                     layer.m = np.zeros(layer.get_weights_grad().shape)
                     layer.v = np.zeros(layer.get_weights_grad().shape)
                     layer.denom = np.zeros(layer.get_weights_grad().shape)

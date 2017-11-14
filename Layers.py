@@ -142,14 +142,14 @@ class Conv2d(Layer):
     def backward(self, input_data, grad_from_back):
         t = time.time()
         bs,ch,h,w = input_data.shape
-        bs,oc,oh,ow = grad_from_back.shape
+       
 
         self.weight_grad.fill(0.0)
         self.grad_input = np.zeros(input_data.shape)
       
         if grad_from_back.ndim < 4: # better to throw a warning here.
             grad_from_back = np.reshape(grad_from_back, (bs,self.output_channel,self.output_y,self.output_x) )
-
+        bs,oc,oh,ow = grad_from_back.shape
         # (bs,oc,iy,ix)
         self.bias_grad = np.sum(grad_from_back,axis=(0,2,3))
         
@@ -181,55 +181,81 @@ class SpatialBN(Layer):
         self.eps = 1e-5
         self.weight = np.zeros(channel);
         self.bias = np.zeros(channel);
+        self.real_mean = np.array([])
+        self.real_var = np.array([])
+        self.isTrain = True
 
     def forward(self,input_data):
 
         bs,c,h,w = input_data.shape
         self.input = input_data
-        # mean [batch,ch,h,w]
-        self.m = np.mean(input_data,axis=0,keepdims=True)
-        # variance
-        self.v = np.var(input_data,axis=0,keepdims=True)
         
-        self.sqrt_v = np.sqrt(self.v) + self.eps;
-        #normalize [bs,ch,h,w]
-        self.x_hat = (input_data - np.repeat(self.m,bs,axis=0) ) / (np.repeat(self.sqrt_v,bs,axis=0) )
+        # update real mean and real var;
+        if self.isTrain:
+           
+           
+            self.mu = np.mean(input_data,axis=0,keepdims=True)
+            self.vu = np.var(input_data,axis=0,keepdims=True)
+            self.sqrt_v = np.sqrt(self.vu) + self.eps;
+            #normalize [bs,ch,h,w]
+            self.x_hat = (input_data - self.mu ) / self.sqrt_v 
+            # bs x ch x h x w
+            self.output = self.x_hat * np.reshape(self.weight,(1,self.channel,1,1)) + np.reshape(self.bias,(1,self.channel,1,1))
+            if self.real_mean.shape == np.array([]).shape:
+                print('here')
+                self.real_mean = self.mu
+                self.real_var = self.vu
+            else:
+                self.real_mean = self.real_mean * 0.9 + self.mu * 0.1
+                self.real_var = self.real_var * 0.9 +  self.vu * 0.1
+        else:
+          
+            self.sqrt_v = np.sqrt(self.real_var) + self.eps;
+            #normalize [bs,ch,h,w]
+            self.x_hat = (input_data - self.real_mean ) / self.real_var
+            # bs x ch x h x w
+            self.output = self.x_hat * np.reshape(self.weight,(1,self.channel,1,1)) + np.reshape(self.bias,(1,self.channel,1,1))
         
-        # bs x ch x h x w
-        self.output = self.x_hat *  np.reshape(self.weight,(1,self.channel,1,1)) + np.reshape(self.bias,(1,self.channel,1,1))
-
         return self.output
 
     def backward(self,input_data,grad_from_back):
         
-        bs,c,h,w =  input_data.shape
-
-        self.bias_grad = np.sum(np.sum(np.sum(grad_from_back,axis=3),axis=2),axis=0)
-        
-        self.weight_grad = np.sum(np.sum(np.sum(self.x_hat*grad_from_back,axis=3),axis=2),axis=0)
+        bs,c,h,w =  self.input.shape
+        if grad_from_back.ndim < 4: # better to throw a warning here.
+            grad_from_back = np.reshape(grad_from_back, self.input.shape )
+        self.bias_grad = np.sum(grad_from_back,axis=(0,2,3)) 
+        X_mu = self.input - self.mu
+        self.weight_grad = np.sum(self.x_hat*grad_from_back,axis=(0,2,3))
         
         d_hat = np.reshape(self.weight,(1,self.channel,1,1)) * grad_from_back
         
-        d_sqrt_var = - 1. / (self.sqrt_v**2) * d_hat
+        d_mu = 1. / self.sqrt_v * d_hat
+        
+        d_ss = np.sum(X_mu * d_hat,axis=0,keepdims=True)
+        
+        d_sqrt_var = - 1. / (self.sqrt_v**2) * d_ss
         # bs x c x h x w
         dvar = 0.5 * 1 / self.sqrt_v * d_sqrt_var
         
         dsq = np.ones((bs,c,w,h))/bs * dvar;
         
-        d_v = 2*self.m * dsq
+        d_v = 2*self.mu * dsq
         
-        d_m = d_hat * self.v
+        d_mv = d_v + d_mu
         
-        d_mv = d_v + d_m
-        
-        d_u = -1 * np.sum(d_mv,axis=0)
-        
+        d_u =  np.sum(d_hat*-1/self.sqrt_v,axis=0) + d_v * np.mean(-2. * X_mu, axis=0)
 
-        d_x2 = np.ones((bs,c,w,h))/bs * np.expand_dims(d_u,axis=0)
+        d_x2 = np.ones((bs,c,w,h))/bs * d_u
         
         self.grad_input = d_x2 + d_mv
     
         return self.grad_input
+
+    def train(self):
+        self.isTrain = True
+
+    def evaluate(self):
+        self.isTrain = False
    
 class BN(Layer):
     def __init__(self,channel):

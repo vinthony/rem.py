@@ -15,13 +15,13 @@ class Model(object):
         if not self.stack:
             return
         for i in range(len(self.stack)):
-            if self.stack[i].type == 'dropout':
+            if self.stack[i].type == 'dropout' or self.stack[i].type == 'bn':
                 self.stack[i].train()
 
     def evaluate(self):
         self.train_flag = False
         for i in self.stack:
-            if i.type == 'dropout':
+            if i.type == 'dropout' or i.type == 'bn':
                 i.evaluate()
 
     def getStatus(self):

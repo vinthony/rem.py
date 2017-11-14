@@ -77,6 +77,32 @@ class NetworkWithBN(Model):
                 )
         return op
 
+
+class CNNWithBN(Model):
+    def __init__(self):
+        super(CNNWithBN,self).__init__()
+        self.conv1 = Conv2d(1,32,[3,3],[2,2],[1,1]); # 28x28 -> 32 x 14 x 14
+        self.conv2 = Conv2d(32,32,[3,3],[2,2],[1,1]); # 32x14x14 -> 32 x 7 x 7
+        self.conv3 = Conv2d(32,32,[3,3],[2,2],[1,1]); # 32 x 4 x 4
+        self.bn1 = SpatialBN(32)
+        self.bn2 = SpatialBN(32)
+        self.bn3 = SpatialBN(32)
+        # self.bn5 = BN(128)
+        self.linear1 = Linear(512,49);
+        self.linear2 = Linear(49,10); # 
+        self.relu1 = NonLinear(subtype='relu')
+        self.relu2 = NonLinear(subtype='relu')
+        self.relu3 = NonLinear(subtype='relu')
+        self.relu4 = NonLinear(subtype='relu')
+        
+    def forward(self,input_data):
+        op1 = self.relu1(self.bn1(self.conv1(input_data)));
+        op2 = self.relu2(self.bn2(self.conv2(op1)));
+        op3 = self.linear1(self.bn3(self.relu3(self.conv3(op2))));
+        op4 = self.linear2(self.relu4(op3))
+        return op4
+    
+    
 class CNN(Model):
     def __init__(self):
         super(CNN,self).__init__()
@@ -136,7 +162,7 @@ if __name__ == '__main__':
     
     _validate = data_loader(test_samples,test_labels,1)
     
-    network = CNN()
+    network = CNNWithBN()
     #network = Model().load(model_path)
     network.init(init_type)
     
@@ -147,7 +173,7 @@ if __name__ == '__main__':
     begin = time.time()
     best_acc = 0  
 
-    logging.info('[{}][network:{}][optimizer:{}][learningRate:{}]'.format(name,network.__class__.__name__,'Adam',parameters['lr']))
+    logging.info('[{}][network:{}][optimizer:{}][learningRate:{}][init_method:{}]'.format(name,network.__class__.__name__,'Adam',parameters['lr'],init_type))
     
     for i in range(iteration):
         
