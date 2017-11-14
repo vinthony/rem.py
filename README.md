@@ -73,8 +73,9 @@ I will find someway else for more complex network structure.
 default network structure(as shown above) validates on MNIST test set.
 
 |network| iteration | time | accuracy|
-|---|----|----|
+|---|----|----| --- |
 | simple(sgd) | -- | 10000(~20epochs) | 85%|
-| simple(adam) | 4768s |10000(~20epochs) |  97.32% |
+| simple(adam)[-1,1] | 4768s |10000(~20epochs) |  97.32% |
+| simple(adam)[0,1] | 4768s |10000(~20epochs) | 97.67% |
 
 ![accuracy](https://github.com/vinthony/rem.py/blob/master/assets/default.png)
