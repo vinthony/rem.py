@@ -3,10 +3,6 @@ import struct
 import math
 
 def save_model(filename,network):
-    # save the weight of network;
-    # save the structure of network;
-    #f = h5py.File(filename,"w")
-    #f.create_dataset('network',  len(repr(network)) ,'s10',repr(network))
     with open(filename, 'w') as f:
         network.save(f)
 
@@ -41,7 +37,6 @@ def data_loader(image,label,batch_size):
             batch_label = labels[batch_idx:batch_idx+batch_size]
             batch_image = images[batch_idx:batch_idx+batch_size].astype('float32')
             
-            #print(np.max(batch_image),np.min(batch_image))
             #normalize
             batch_image = (images[batch_idx:batch_idx+batch_size]/255 )
         
@@ -54,9 +49,8 @@ def accuracy(input_label, target_label):
     tl = np.argmax(target_label)
     return il == tl
 
-def im2col(imgray,k,stride,padding):
+def im2col(imgray,k,stride,padding,isforward=True,adjr=0,adjc=0):
     bs,ch,h,w = imgray.shape
-
     r = k[0];
     c = k[1];
     
@@ -65,40 +59,13 @@ def im2col(imgray,k,stride,padding):
     
     pr = padding[0];
     pc = padding[1];
-
-    output_x = (w + 2*pr - r )//sr + 1;
-    output_y = (h + 2*pc - c )//sc + 1;
     
-    larger = np.zeros((bs,ch,h+2*pr,w+2*pc))
-
-    larger[:,:,pr:pr+h,pc:pc+w] = imgray
-    
-    re = np.zeros( (bs,ch*r*c,output_x*output_y),dtype='float32');
-
-    for y in range(0,h+2*pr-r+1,sr):
-        for x in range(0,w+2*pc-c+1,sc):
-            re[:,:,output_x*(y//sr)+(x//sc)] = np.reshape(larger[:,:,y:y+r,x:x+c],(bs,-1))
-    
-    return re;
-
-
-def imremap(imgray,oh,ow,k,stride,padding):
-    bs,ch,h,w = imgray.shape
-
-    r = k[0];
-    c = k[1];
-    
-    sr = stride[0];
-    sc = stride[1];
-    
-    pr = padding[0];
-    pc = padding[1];
-
-    output_x = math.ceil( (w-1)*sr + r - 2*pr ); #(w + 2*pr - r )//sr + 1;
-    output_y = math.ceil( (h-1)*sc + c - 2*pc ); #(h + 2*pc - c )//sc + 1;
-    
-    if output_x < ow: output_x = ow;
-    if output_y < oh: output_y = oh;
+    if isforward:
+        output_x = (w + 2*pr - r )//sr + 1;
+        output_y = (h + 2*pc - c )//sc + 1;
+    else:
+        output_x = (w-1)*sr - 2*pr + r + adjr
+        output_y = (h-1)*sc - 2*pc + c + adjc
 
     larger = np.zeros((bs,ch,h+2*pr,w+2*pc))
 
@@ -106,11 +73,14 @@ def imremap(imgray,oh,ow,k,stride,padding):
     
     re = np.zeros( (bs,ch*r*c,output_x*output_y),dtype='float32');
 
+    count = 0
     for y in range(0,h+2*pr-r+1,sr):
         for x in range(0,w+2*pc-c+1,sc):
-            re[:,:,output_x*(y*sr)+(x*sc)] = np.reshape(larger[:,:,y:y+r,x:x+c],(bs,-1))
-
+            re[:,:,count] = np.reshape(larger[:,:,y:y+r,x:x+c],(bs,-1))
+            count = count + 1
+    
     return re;
+
 
 
 if __name__ == '__main__':

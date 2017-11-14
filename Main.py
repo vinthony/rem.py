@@ -134,7 +134,7 @@ if __name__ == '__main__':
     
     _validate = data_loader(test_samples,test_labels,1)
     
-    network = Network()
+    network = CNN()
     #network = Model().load(model_path)
     network.init(init_type)
     
