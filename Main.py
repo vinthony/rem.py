@@ -138,7 +138,6 @@ if __name__ == '__main__':
     #network = Model().load(model_path)
     network.init(init_type)
     
-   
     optimizer = Optimizer(parameters)
 
     criterion = CrossEntropy()

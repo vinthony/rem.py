@@ -40,7 +40,7 @@ class CrossEntropy(Criterion):
         return self.softmax - target_data
     
     
-def L1Loss(Criterion):
+class L1Loss(Criterion):
     
     def __init__(self):
         super(L1Loss,self).__init__()
@@ -56,7 +56,7 @@ def L1Loss(Criterion):
         
         return s1-s_01;
     
-def L2Loss(Criterion):
+class L2Loss(Criterion):
     
     def __init__(self):
         super(L1Loss,self).__init__()

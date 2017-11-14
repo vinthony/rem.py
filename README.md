@@ -28,6 +28,11 @@ a toy neural network based on python
 * backend:
     - [ ] c/cpp
     - [ ] cuda
+    
+* tester with pytorch:
+    - [ ] layers
+    - [ ] optimizer
+    - [ ] other
 
 # easy to use
 

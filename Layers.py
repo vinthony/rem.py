@@ -17,7 +17,7 @@ def static_vars(**kwargs):
     return decorate
 
 
-from utils import im2col
+from utils import im2col,col2im
 
 class Layer(object):
     counter = 0
@@ -131,17 +131,21 @@ class Conv2d(Layer):
         self.output_x = (w + 2*self.padding[0] - self.kernel[0] )//self.stride[0] + 1;
         self.output_y = (h + 2*self.padding[1] - self.kernel[1] )//self.stride[1] + 1;
         
-        self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )     
+        self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) ) 
+
+        # (bs,ic*k*k,oy*ox)    
         self.imcol_all = im2col(input_data,self.kernel,self.stride,self.padding)
         
         #(oc,1)
         bs_bais = np.reshape(self.bias,[self.output_channel,1])
         
-        # (oc , ic*k*k) x (ic*k*k, x*y) 
+        # (oc , ic*k*k) 
         bs_weight = np.reshape(self.weight,[self.output_channel,-1]);
         
         for i in range(bs):
-            self.output[i,:,:,:] = np.reshape(np.dot(bs_weight,self.imcol_all[i]) + bs_bais,(self.output_channel,self.output_y,self.output_x))
+            #(oc,oy*ox) + (oc,1)
+            M = np.dot(bs_weight,self.imcol_all[i]) + bs_bais;
+            self.output[i,:,:,:] = np.reshape(M,(self.output_channel,self.output_y,self.output_x))
 
         return self.output
     
@@ -149,14 +153,15 @@ class Conv2d(Layer):
         t = time.time()
         bs,ch,h,w = input_data.shape
         bs,oc,oh,ow = grad_from_back.shape
+
         self.weight_grad.fill(0.0)
         self.grad_input = np.zeros(input_data.shape)
       
-        if grad_from_back.ndim < 4:
+        if grad_from_back.ndim < 4: # better to throw a warning here.
             grad_from_back = np.reshape(grad_from_back, (bs,self.output_channel,self.output_y,self.output_x) )
 
-        self.bias_grad = np.sum(np.sum(np.sum(grad_from_back,axis=3),axis=2),axis=0)
-        self.transposed_weight = np.rot90(self.weight,k=2,axes=(2,3))  # rotate 180 for derivate
+        # (bs,oc,iy,ix)
+        self.bias_grad = np.sum(grad_from_back,axis=(0,2,3))
         
         #(bs, x*y, ic*k*k)
         trans_imcol = np.transpose(self.imcol_all,(0,2,1))
@@ -165,18 +170,15 @@ class Conv2d(Layer):
             self.weight_grad += np.reshape(np.dot(np.reshape(grad_from_back[i],(oc,oh*ow)),trans_imcol[i]),(oc,ch,self.kernel[0],self.kernel[1]))
         
         self.weight_grad = self.weight_grad/bs;
-                
-        adjh = h - ((oh-1)*self.stride[0] - 2*self.padding[0] + self.kernel[0]) 
-        adjw = w - ((ow-1)*self.stride[1] - 2*self.padding[1] + self.kernel[1]) 
-        # bs x  oc*k*k x h*w
-        self.imcol_grad_all = im2col(grad_from_back,self.kernel,self.stride,self.padding,False,adjh,adjw)     
-        # ic * oc * k * k 
-        extend_transpose_weight =  np.reshape(np.transpose(self.transposed_weight,(1,0,2,3)),[self.input_channel,-1])
-    
+        
+        d_col = np.zeros((bs,self.input_channel*self.kernel[0]*self.kernel[1],oh*ow))
+        
         for i in range(bs):
-            #  ic * oc * k * k , oc*k*k x h*w
-            self.grad_input[i] = np.reshape(np.dot( np.reshape(extend_transpose_weight,[ch,-1]),self.imcol_grad_all[i]),(ch,h,w))
-       
+            d_col[i] = np.dot(np.reshape(self.weight,(self.output_channel,-1)).T,np.reshape(grad_from_back[i],(oc,-1)))
+
+        # reshape the d_col to image. d_col[bs,ic*k*k,oh*ow]
+        self.output = col2im(d_col,input_data.shape,self.kernel,self.stride,self.padding)
+
         return self.grad_input
 
 
