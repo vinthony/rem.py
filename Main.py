@@ -7,6 +7,7 @@ This is a temporary script file.
 
 import numpy as np
 import time
+import datetime
 from Models import Model
 import logging
 
@@ -15,9 +16,9 @@ from Criterions import CrossEntropy
 from utils import getMatrixOfClass,save_model,data_loader,accuracy   
 from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool,Dropout,SpatialBN
 
-class NetworkWithDropout(Model):
+class MLPWithDropout(Model):
     def __init__(self):
-        super(NetworkWithDropout,self).__init__()
+        super(MLPWithDropout,self).__init__()
         self.linear1 = Linear(28*28,14*14);
         self.linear2 = Linear(14*14,7*7);
         self.linear3 = Linear(7*7,10);
@@ -30,9 +31,9 @@ class NetworkWithDropout(Model):
         op = self.linear3(self.dropout2(self.relu2(self.linear2(self.dropout1(self.relu1(self.linear1(input_data)))))))
         return op
 
-class NetworkKeras(Model):
+class MLPKeras(Model):
     def __init__(self):
-        super(NetworkKeras,self).__init__()
+        super(MLPKeras,self).__init__()
         self.linear1 = Linear(28*28,512);
         self.linear2 = Linear(512,512);
         self.linear3 = Linear(512,10);
@@ -45,9 +46,9 @@ class NetworkKeras(Model):
         op = self.linear3(self.dropout2(self.relu2(self.linear2(self.dropout1(self.relu1(self.linear1(input_data)))))))
         return op
 
-class Network(Model):
+class MLP(Model):
     def __init__(self):
-        super(Network,self).__init__()
+        super(MLP,self).__init__()
         self.linear1 = Linear(28*28,14*14);
         self.linear2 = Linear(14*14,7*7);
         self.linear3 = Linear(7*7,10);
@@ -58,9 +59,9 @@ class Network(Model):
         op = self.linear3(self.relu1(self.linear2(self.relu2(self.linear1(input_data)))))
         return op
     
-class NetworkWithBN(Model):
+class MLPWithBN(Model):
     def __init__(self):
-        super(NetworkWithBN,self).__init__()
+        super(MLPWithBN,self).__init__()
         self.linear1 = Linear(28*28,14*14);
         self.linear2 = Linear(14*14,7*7);
         self.linear3 = Linear(7*7,10);
@@ -101,7 +102,51 @@ class CNNWithBN(Model):
         op3 = self.linear1(self.bn3(self.relu3(self.conv3(op2))));
         op4 = self.linear2(self.relu4(op3))
         return op4
-    
+
+
+class CNNKerasDropout(Model):
+    def __init__(self):
+        super(CNNKerasDropout,self).__init__()
+        self.conv1 = Conv2d(1,32,[3,3],[1,1],[1,1]); # 28x28 -> 32 x 28 x 28
+        self.conv2 = Conv2d(32,64,[3,3],[2,2],[1,1]); # 32x14x14 -> 64 x 7 x 7
+#        self.bn1 = SpatialBN(32)
+#        self.bn2 = SpatialBN(32)
+#        self.bn3 = SpatialBN(32)
+        # self.bn5 = BN(128)
+        self.dropout1 = Dropout(0.25)
+        self.dropout2 = Dropout(0.5)
+        self.linear1 = Linear(12544,128);
+        self.linear2 = Linear(128,10); # 
+        self.relu1 = NonLinear(subtype='relu')
+        self.relu2 = NonLinear(subtype='relu')
+        self.relu4 = NonLinear(subtype='relu')
+        
+    def forward(self,input_data):
+        op1 = self.relu1(self.conv1(input_data));
+        op2 = self.dropout1(self.relu2(self.conv2(op1)));
+        op3 = self.dropout2(self.relu4(self.linear1(op2)));
+        op4 = self.linear2(op3)
+        return op4  
+
+class CNNKeras(Model):
+    def __init__(self):
+        super(CNNKeras,self).__init__()
+        self.conv1 = Conv2d(1,32,[3,3],[1,1],[1,1]); # 28x28 -> 32 x 28 x 28
+        self.conv2 = Conv2d(32,64,[3,3],[2,2],[1,1]); # 32x14x14 -> 64 x 7 x 7
+
+        self.linear1 = Linear(12544,128);
+        self.linear2 = Linear(128,10); # 
+        self.relu1 = NonLinear(subtype='relu')
+        self.relu2 = NonLinear(subtype='relu')
+        self.relu4 = NonLinear(subtype='relu')
+        
+    def forward(self,input_data):
+        op1 = self.relu1(self.conv1(input_data));
+        op2 = self.relu2(self.conv2(op1));
+        op3 = self.linear1(op2);
+        op4 = self.linear2(self.relu4(op3))
+        return op4 
+
     
 class CNN(Model):
     def __init__(self):
@@ -134,8 +179,7 @@ if __name__ == '__main__':
     iteration = 10000 # ~20epochs
     batch_size = 128
     save_iter = 50
-    validate_iter = 20
-    disp_iter = 5
+    validate_iter = 50
     
     traing_samples = 'dataset/train-images.idx3-ubyte' 
     traing_labels = 'dataset/train-labels.idx1-ubyte'
@@ -156,14 +200,14 @@ if __name__ == '__main__':
                 "beta1":0.9,
                 "beta2":0.999,
             }
-    init_type = 'kaiming' # console4:kaiming
+    init_type = 'xavier' # normal,kaiming,xavier
      
     _iter = data_loader(traing_samples,traing_labels,batch_size)
     
     _validate = data_loader(test_samples,test_labels,1)
     
     network = CNNWithBN()
-    #network = Model().load(model_path)
+
     network.init(init_type)
     
     optimizer = Optimizer(parameters)
@@ -172,9 +216,9 @@ if __name__ == '__main__':
     
     begin = time.time()
     best_acc = 0  
-
-    logging.info('[{}][network:{}][optimizer:{}][learningRate:{}][init_method:{}]'.format(name,network.__class__.__name__,'Adam',parameters['lr'],init_type))
-    
+    logs = '[{}][network:{}][optimizer:{}][learningRate:{}][init_method:{}]'.format(datetime.datetime.fromtimestamp(name),network.__class__.__name__,'Adam',parameters['lr'],init_type)
+    logging.info(logs)
+    print(logs)
     for i in range(iteration):
         
         input_image, label = _iter.__next__() # 2.7 )_iter.next() / 3.6 : _iter.__next__()
@@ -196,7 +240,6 @@ if __name__ == '__main__':
             
         if (i+1) % validate_iter == 0:
             network.evaluate()
-            print('start evaluate')
             # 10000
             count = 0
             for j in range(10000):
@@ -204,8 +247,10 @@ if __name__ == '__main__':
                 vlabel = getMatrixOfClass(vlabel)
                 vxlabel = network(np.reshape(valid_image,input_shape))   
                 count = count + accuracy(vxlabel,vlabel)
-            if count/10000*100 > best_acc: best_acc = count/10000*100
-            logging.info("iter:{},loss:{:.2f}, accuracy:{:.2f}%".format(i,loss,count/10000*100))
+            if count/10000*100 > best_acc:
+                best_acc = count/10000*100
+                save_model("checkpoints/best_{}_{}.json".format(i,init_type),network)
+            logging.info("iter:{},loss:{:.2f}, accuracy:{:.2f}%,time:{:.2f}h".format(i,loss,count/10000*100),(time.time()-begin)/3600)
             network.train()
 
     logging.info("total time:{:.2f}h, best accuracy:{:.2f}%, model paramaters:{}".format((time.time()-begin)/3600,best_acc,network.getParametersOfModel()))

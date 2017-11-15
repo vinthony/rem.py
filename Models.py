@@ -52,7 +52,7 @@ class Model(object):
                 # build network from stack
                 # sort the stack 
                 for k2 in json.loads(v):
-                    if k2['type'] == 'linear' or k2['type'] == 'conv2d':
+                    if k2['type'] == 'linear' or k2['type'] == 'conv2d' or k2['type'] == 'bn':
                         l = Linear(k2['input_channel'],k2['output_channel'],callid=k2['callid'])
                         l.set_weights(np.asarray(k2['weight']))
                         l.set_bias(np.asarray(k2['bias']))
@@ -106,8 +106,8 @@ class Model(object):
                     i.set_weights(np.random.normal(0,0.02,i.get_weights().shape))
                     i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
                 if i.get_name() == 'bn':
-                    i.set_weights(np.random.normal(1,0.02,i.get_weights().shape))
-                    i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+                    i.set_weights(np.ones(i.get_weights().shape))
+                    i.set_bias(np.zeros(i.get_bias().shape))
                 if i.get_name() == 'linear':
                     i.set_weights(np.random.normal(0,0.02,i.get_weights().shape))
                     i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))

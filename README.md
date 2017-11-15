@@ -6,11 +6,11 @@ a toy neural network based on python
 
 * layers:
     - [x] Conv2d
-    - [x] Batch normalization (need checking)
-    - [x] pooling (need add background)
+    - [x] Batch normalization (some bugs here)
+    - [x] Maxpooling / Averagepooling
     - [x] relu
     - [x] linear
-    - [x] dropout (something wrong in dropout)
+    - [x] dropout
     
 * loss:
     - [x] L1/L2
@@ -33,6 +33,10 @@ a toy neural network based on python
     - [ ] layers
     - [ ] optimizer
     - [ ] other
+
+* Algorithm Examples:
+    - [x] MLP
+    - [x] CNN
 
 # easy to use
 
@@ -79,8 +83,7 @@ default network structure(as shown above) validates on MNIST test set.
 
 |network| iteration | time | accuracy|
 |---|----|----| --- |
-| simple(sgd) | -- | 10000(~20epochs) | 85%|
-| simple(adam)[-1,1] | 4768s |10000(~20epochs) |  97.32% |
-| simple(adam)[0,1] | 4768s |10000(~20epochs) | 97.67% |
-
-![accuracy](https://github.com/vinthony/rem.py/blob/master/assets/default.png)
+| MLP(sgd) | -- | 10000(~20epochs) | 85%|
+| MLP(adam)[-1,1] | 4768s |10000(~20epochs) |  97.32% |
+| MLP(adam)[0,1] | 4768s |10000(~20epochs) | 97.67% |
+| CNN(adam)[0,1] | -- |4000(~8epochs) | 98.62% |

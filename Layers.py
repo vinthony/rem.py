@@ -143,7 +143,6 @@ class Conv2d(Layer):
         t = time.time()
         bs,ch,h,w = input_data.shape
        
-
         self.weight_grad.fill(0.0)
         self.grad_input = np.zeros(input_data.shape)
       
@@ -179,7 +178,7 @@ class SpatialBN(Layer):
         self.type = 'bn'
         self.channel = channel
         self.eps = 1e-5
-        self.weight = np.zeros(channel);
+        self.weight = np.ones(channel);
         self.bias = np.zeros(channel);
         self.real_mean = np.array([])
         self.real_var = np.array([])
@@ -189,30 +188,27 @@ class SpatialBN(Layer):
 
         bs,c,h,w = input_data.shape
         self.input = input_data
-        
         # update real mean and real var;
         if self.isTrain:
            
-           
             self.mu = np.mean(input_data,axis=0,keepdims=True)
             self.vu = np.var(input_data,axis=0,keepdims=True)
-            self.sqrt_v = np.sqrt(self.vu) + self.eps;
+            self.sqrt_v = np.sqrt(self.vu + self.eps) ;
             #normalize [bs,ch,h,w]
             self.x_hat = (input_data - self.mu ) / self.sqrt_v 
             # bs x ch x h x w
             self.output = self.x_hat * np.reshape(self.weight,(1,self.channel,1,1)) + np.reshape(self.bias,(1,self.channel,1,1))
+
             if self.real_mean.shape == np.array([]).shape:
-                print('here')
-                self.real_mean = self.mu
-                self.real_var = self.vu
+                self.real_mean = np.zeros(self.mu.shape)
+                self.real_var = np.ones(self.vu.shape)
             else:
                 self.real_mean = self.real_mean * 0.9 + self.mu * 0.1
                 self.real_var = self.real_var * 0.9 +  self.vu * 0.1
         else:
-          
-            self.sqrt_v = np.sqrt(self.real_var) + self.eps;
+            self.test_sqrt_var = np.sqrt(self.real_var + self.eps) 
             #normalize [bs,ch,h,w]
-            self.x_hat = (input_data - self.real_mean ) / self.real_var
+            self.x_hat = (input_data - self.real_mean ) / self.test_sqrt_var
             # bs x ch x h x w
             self.output = self.x_hat * np.reshape(self.weight,(1,self.channel,1,1)) + np.reshape(self.bias,(1,self.channel,1,1))
         
@@ -223,32 +219,23 @@ class SpatialBN(Layer):
         bs,c,h,w =  self.input.shape
         if grad_from_back.ndim < 4: # better to throw a warning here.
             grad_from_back = np.reshape(grad_from_back, self.input.shape )
+        
         self.bias_grad = np.sum(grad_from_back,axis=(0,2,3)) 
-        X_mu = self.input - self.mu
         self.weight_grad = np.sum(self.x_hat*grad_from_back,axis=(0,2,3))
+        X_mu = self.input - self.mu
         
         d_hat = np.reshape(self.weight,(1,self.channel,1,1)) * grad_from_back
         
         d_mu = 1. / self.sqrt_v * d_hat
         
-        d_ss = np.sum(X_mu * d_hat,axis=0,keepdims=True)
+        d_norm = np.sum(X_mu * d_hat,axis=0,keepdims=True)
         
-        d_sqrt_var = - 1. / (self.sqrt_v**2) * d_ss
-        # bs x c x h x w
-        dvar = 0.5 * 1 / self.sqrt_v * d_sqrt_var
-        
-        dsq = np.ones((bs,c,w,h))/bs * dvar;
-        
-        d_v = 2*self.mu * dsq
-        
-        d_mv = d_v + d_mu
-        
-        d_u =  np.sum(d_hat*-1/self.sqrt_v,axis=0) + d_v * np.mean(-2. * X_mu, axis=0)
+        dvar_2 = d_norm * -0.5 * (1. /self.sqrt_v)**3
 
-        d_x2 = np.ones((bs,c,w,h))/bs * d_u
+        d_var = np.sum(d_norm * -1. / self.sqrt_v,axis=0,keepdims=True) + dvar_2 * np.mean(-2*X_mu,axis=0,keepdims=True)
         
-        self.grad_input = d_x2 + d_mv
-    
+        self.grad_input = d_hat * -1/self.sqrt_v + dvar_2 * 2 * X_mu/bs + d_var/bs 
+
         return self.grad_input
 
     def train(self):
@@ -258,33 +245,46 @@ class SpatialBN(Layer):
         self.isTrain = False
    
 class BN(Layer):
-    def __init__(self,channel):
+    def __init__(self):
         #https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
         super(BN,self).__init__()
         self.type = 'bn'
-        self.channel = channel
+        self.channel = 1
         self.eps = 1e-5
-        self.weight = np.zeros(channel);
-        self.bias = np.zeros(channel);
+        self.weight = np.zeros(1);
+        self.bias = np.zeros(1);
+        self.real_mean = np.array([])
+        self.real_var = np.array([])
+        self.isTrain = True
 
     def forward(self,input_data):
 
         bs,c = input_data.shape
         
-        self.input = input_data
-        
-        # mean [batch,ch,h,w]
-        self.m = np.mean(input_data,axis=0,keepdims=True)
-        # variance
-        self.v = np.var(input_data,axis=0,keepdims=True)
-        
-        self.sqrt_v = np.sqrt(self.v) + self.eps;
-        #normalize [bs,ch,h,w]
-        self.x_hat = (input_data - np.repeat(self.m,bs,axis=0) ) / (np.repeat(self.sqrt_v,bs,axis=0) )
+        if self.isTrain:
+           
+            self.mu = np.mean(input_data,axis=0,keepdims=True)
+            self.vu = np.var(input_data,axis=0,keepdims=True)
+            self.sqrt_v = np.sqrt(self.vu) + self.eps;
+            #normalize [bs,ch]
+            self.x_hat = (input_data - self.mu ) / self.sqrt_v 
+            # bs x ch x h x w
+            self.output = self.x_hat * np.reshape(self.weight,(1,self.channel)) + np.reshape(self.bias,(1,self.channel))
 
-        # bs x ch x h x w
-        self.output = self.x_hat * np.repeat(np.reshape(self.weight,(1,-1)),bs,axis=0) + np.repeat(np.reshape(self.bias,(1,-1)),bs,axis=0)
-
+            if self.real_mean.shape == np.array([]).shape:
+                self.real_mean = np.zeros(self.mu.shape)
+                self.real_var = np.ones(self.vu.shape)
+            else:
+                self.real_mean = self.real_mean * 0.9 + self.mu * 0.1
+                self.real_var = self.real_var * 0.9 +  self.vu * 0.1
+        else:
+          
+            self.test_sqrt_var = np.sqrt(self.real_var) + self.eps;
+            #normalize [bs,ch 
+            self.x_hat = (input_data - self.real_mean ) / self.test_sqrt_var
+            # bs x ch 
+            self.output = self.x_hat * np.reshape(self.weight,(1,self.channel)) + np.reshape(self.bias,(1,self.channel))
+        
         return self.output
 
     def backward(self,input_data,grad_from_back):
@@ -334,18 +334,24 @@ class Maxpool(Layer):
         self.output_x = (w + 2*self.padding[0] - self.kernel[0] )//self.stride[0] + 1;
         self.output_y = (h + 2*self.padding[1] - self.kernel[1] )//self.stride[1] + 1;
          
-        #bs x ic*k*k x oy*ox
+        #bs x ic x k*k x oy*ox
         self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )     
-        self.imcol_all = np.reshape(im2col(input_data,self.kernel,self.stride,self.padding),(bs,ch,self.kernel[0]*self.kernel[1],self.output_x*self.output_y))
+        self.imcol_all = np.reshape(im2col(input_data,self.kernel,self.stride,self.padding),(bs,ch,self.kernel[0]*self.kernel[1],self.output_y,self.output_x))
         
         # bs,op,
-        self.output = np.max(self.imcol_all,3)
+        self.output = np.max(self.imcol_all,2)
+        self.max_idx = np.argmax(self.imcol_all,2)
         
         return self.output
     
-    def backward(self):
-        pass
-    
+    def backward(self,grad_from_back):
+        bs,oc,h,w = grad_from_back.shape
+        #(bs,self.input_channel*self.kernel[0]*self.kernel[1],oh*ow)
+        #bs ic h*w
+        d_col = np.zeros((bs,ic*self.kernel[0]*self.kernel[1],h*w))
+        d_col[self.max_idx] = grad_from_back 
+        self.grad_input=col2im(d_col,self.input.shape,self.kernel,self.stride,self.padding)
+        return self.grad_input
 
 class Averagepool(Layer):
     def __init__(self,kernel,stride,padding):
@@ -365,21 +371,24 @@ class Averagepool(Layer):
         #bs x ic*k*k x oy*ox
         self.output = np.zeros( (bs,self.output_channel,self.output_y,self.output_x) )     
         self.imcol_all = np.reshape(im2col(input_data,self.kernel,self.stride,self.padding),(bs,ch,self.kernel[0]*self.kernel[1],self.output_x*self.output_y))
-        
         # bs,op,
-        self.output = np.mean(self.imcol_all,3);
+        self.output = np.mean(self.imcol_all,2);
         
         return self.output
     
     def backward(self,input_data,grad_from_back):
-       
-       pass
+        bs,oc,h,w = grad_from_back.shape
+        #bs ic h*w
+        d_col = np.reshape(np.repeat(grad_from_back,(1,self.kernel[0]*self.kernel[1],1,1)),(bs,ic*self.kernel[0]*self.kernel[1],h*w))
+        self.grad_input=col2im(d_col,self.input.shape,self.kernel,self.stride,self.padding)
+        return self.grad_input
+        
 
 class Dropout(Layer):
     def __init__(self,prob,**kwags):
         super(Dropout,self).__init__(**kwags)
         self.type = 'dropout'
-        self.prob = prob
+        self.prob = prob or 0.5
         self.isTrain = True
     
     def forward(self,input_data):
