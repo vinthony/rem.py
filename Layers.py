@@ -235,7 +235,7 @@ class SpatialBN(Layer):
 
         d_var = np.sum(d_norm * -1. / self.sqrt_v,axis=0,keepdims=True) + dvar_2 * np.mean(-2.*X_mu,axis=0,keepdims=True)
         
-        self.grad_input = d_hat * -1/self.sqrt_v + dvar_2 * 2 * X_mu/bs + d_var/bs 
+        self.grad_input = d_hat * 1/self.sqrt_v + dvar_2 * 2 * X_mu/bs + d_var/bs 
 
         return self.grad_input
 
@@ -291,9 +291,9 @@ class BN(Layer):
     def backward(self,input_data,grad_from_back):
         bs,c = self.input.shape
 
-        self.bias_grad = np.array([0]) #np.sum(grad_from_back,axis=0)
+        self.bias_grad = np.sum(grad_from_back,axis=0)
         
-        self.weight_grad = np.array([0]) #np.sum(self.x_hat*grad_from_back,axis=0)
+        self.weight_grad = np.sum(self.x_hat*grad_from_back,axis=0)
         
         X_mu = self.input - self.mu
         
@@ -303,11 +303,11 @@ class BN(Layer):
         
         d_norm = np.sum(X_mu * d_hat,axis=0)
         
-        dvar_2 = d_norm * -0.5 * (1. /self.sqrt_v)**3
+        dvar_2 = d_norm * -0.5 * ((1. /self.sqrt_v)**3)
 
         d_var = np.sum(d_norm * -1. / self.sqrt_v,axis=0) + dvar_2 * np.mean(-2.*X_mu,axis=0)
         
-        self.grad_input = d_hat * -1/self.sqrt_v + dvar_2 * 2 * X_mu/bs + d_var/bs 
+        self.grad_input = d_hat * 1/self.sqrt_v + dvar_2 * 2 * X_mu/bs + d_var/bs 
     
         return self.grad_input
 

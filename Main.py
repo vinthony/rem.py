@@ -206,7 +206,7 @@ if __name__ == '__main__':
     
     _validate = data_loader(test_samples,test_labels,1)
     
-    network = CNNKerasDropout()
+    network = CNNWithBN()
 
     network.init(init_type)
     
