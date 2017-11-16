@@ -111,6 +111,7 @@ class Conv2d(Layer):
         self.weight_grad = np.zeros((output_channel,input_channel,kernel[0],kernel[1]))
         self.bias  = np.zeros(output_channel)
         self.bias_grad = np.zeros(output_channel)
+        # can be improved by remembering the idx of im2col and col2im
         
     def forward(self, input_data):
         # bs x ch x w x h
@@ -132,10 +133,13 @@ class Conv2d(Layer):
         # (oc , ic*k*k) 
         bs_weight = np.reshape(self.weight,[self.output_channel,-1]);
         
-        for i in range(bs):
-            #(oc,oy*ox) + (oc,1)
-            M = np.dot(bs_weight,self.imcol_all[i]) + bs_bais;
-            self.output[i,:,:,:] = np.reshape(M,(self.output_channel,self.output_y,self.output_x))
+        # (ic*k*k,oy*ox*bs)   
+        reshaped_imcol = np.reshape(np.transpose(self.imcol_all,(2,1,0)),(self.input_channel*self.kernel[0]*self.kernel[1],-1))
+
+        #(oc,oy*ox*bs) + (oc,1)
+        M = np.dot(bs_weight,reshaped_imcol) + bs_bais ;
+        
+        self.output = np.transpose(np.reshape(M,(self.output_channel,self.output_y,self.output_x,bs)),(3,0,1,2))
 
         return self.output
     
@@ -152,21 +156,19 @@ class Conv2d(Layer):
         # (bs,oc,iy,ix)
         self.bias_grad = np.sum(grad_from_back,axis=(0,2,3))
         
-        #(bs, x*y, ic*k*k)
-        trans_imcol = np.transpose(self.imcol_all,(0,2,1))
+        #( x*y, ic*k*k,bs)
+        trans_imcol = np.reshape(np.transpose(self.imcol_all,(2,1,0)),(self.output_x*self.output_y,self.input_channel*self.kernel[0]*self.kernel[1]*bs))
         # (bs, oc , oy*ox)
-        for i in range(bs):
-            self.weight_grad += np.reshape(np.dot(np.reshape(grad_from_back[i],(oc,oh*ow)),trans_imcol[i]),(oc,ch,self.kernel[0],self.kernel[1]))
         
-        self.weight_grad = self.weight_grad/bs;
+        #bs,oc,ic*k*k,bs
+        self.weight_grad = np.mean(np.reshape(np.dot(np.reshape(grad_from_back,(bs*oc,oh*ow)),trans_imcol),(bs,oc,ch,self.kernel[0],self.kernel[1],bs)),axis=(0,5))
         
-        d_col = np.zeros((bs,self.input_channel*self.kernel[0]*self.kernel[1],oh*ow))
-        
-        for i in range(bs):
-            d_col[i] = np.dot(np.reshape(self.weight,(oc,-1)).T,np.reshape(grad_from_back[i],(oc,-1)))
-
+                        
+        # ic * k * k x oc, oc x ow*oh*bs
+        d_col = np.dot(np.reshape(self.weight,(oc,-1)).T,np.reshape(np.transpose(grad_from_back,(1,2,3,0)),(oc,-1)))
+        d_colx = np.transpose(np.reshape(d_col,(self.input_channel*self.kernel[0]*self.kernel[1],self.output_x*self.output_y,bs)),(2,0,1))
         # reshape the d_col to image. d_col[bs,ic*k*k,oh*ow]
-        self.grad_input = col2im(d_col,input_data.shape,self.kernel,self.stride,self.padding)
+        self.grad_input = col2im(d_colx,input_data.shape,self.kernel,self.stride,self.padding)
 
         return self.grad_input
 
@@ -190,7 +192,6 @@ class SpatialBN(Layer):
         self.input = input_data
         # update real mean and real var;
         if self.isTrain:
-           
             self.mu = np.mean(input_data,axis=0,keepdims=True)
             self.vu = np.var(input_data,axis=0,keepdims=True)
             self.sqrt_v = np.sqrt(self.vu + self.eps) ;
@@ -232,7 +233,7 @@ class SpatialBN(Layer):
         
         dvar_2 = d_norm * -0.5 * (1. /self.sqrt_v)**3
 
-        d_var = np.sum(d_norm * -1. / self.sqrt_v,axis=0,keepdims=True) + dvar_2 * np.mean(-2*X_mu,axis=0,keepdims=True)
+        d_var = np.sum(d_norm * -1. / self.sqrt_v,axis=0,keepdims=True) + dvar_2 * np.mean(-2.*X_mu,axis=0,keepdims=True)
         
         self.grad_input = d_hat * -1/self.sqrt_v + dvar_2 * 2 * X_mu/bs + d_var/bs 
 
@@ -250,9 +251,9 @@ class BN(Layer):
         super(BN,self).__init__()
         self.type = 'bn'
         self.channel = 1
-        self.eps = 1e-5
-        self.weight = np.zeros(1);
-        self.bias = np.zeros(1);
+        self.eps = 1e-9
+        self.weight = 1;
+        self.bias = 0;
         self.real_mean = np.array([])
         self.real_var = np.array([])
         self.isTrain = True
@@ -263,13 +264,13 @@ class BN(Layer):
         
         if self.isTrain:
            
-            self.mu = np.mean(input_data,axis=0,keepdims=True)
-            self.vu = np.var(input_data,axis=0,keepdims=True)
-            self.sqrt_v = np.sqrt(self.vu) + self.eps;
+            self.mu = np.mean(input_data,axis=0)
+            self.vu = np.var(input_data,axis=0)
+            self.sqrt_v = np.sqrt(self.vu + self.eps);
             #normalize [bs,ch]
             self.x_hat = (input_data - self.mu ) / self.sqrt_v 
             # bs x ch x h x w
-            self.output = self.x_hat * np.reshape(self.weight,(1,self.channel)) + np.reshape(self.bias,(1,self.channel))
+            self.output = self.x_hat * self.weight + self.bias
 
             if self.real_mean.shape == np.array([]).shape:
                 self.real_mean = np.zeros(self.mu.shape)
@@ -279,44 +280,42 @@ class BN(Layer):
                 self.real_var = self.real_var * 0.9 +  self.vu * 0.1
         else:
           
-            self.test_sqrt_var = np.sqrt(self.real_var) + self.eps;
+            self.test_sqrt_var = np.sqrt(self.real_var+ self.eps) ;
             #normalize [bs,ch 
             self.x_hat = (input_data - self.real_mean ) / self.test_sqrt_var
             # bs x ch 
-            self.output = self.x_hat * np.reshape(self.weight,(1,self.channel)) + np.reshape(self.bias,(1,self.channel))
+            self.output = self.x_hat *  self.weight  +  self.bias 
         
         return self.output
 
     def backward(self,input_data,grad_from_back):
-        
         bs,c = self.input.shape
 
-        self.bias_grad = np.sum(grad_from_back,axis=0)
+        self.bias_grad = np.array([0]) #np.sum(grad_from_back,axis=0)
         
-        self.weight_grad = np.sum(self.x_hat*grad_from_back,axis=0)
+        self.weight_grad = np.array([0]) #np.sum(self.x_hat*grad_from_back,axis=0)
         
-        #bs x channel
-        d_hat = np.repeat(np.reshape(self.weight,(1,-1)),bs,axis=0) * grad_from_back
+        X_mu = self.input - self.mu
         
-        d_sqrt_var = - 1. / (self.sqrt_v**2) * d_hat
-        # bs x c x h x w
-        dvar = 0.5 * 1 / self.sqrt_v * d_sqrt_var
+        d_hat = self.weight * grad_from_back
         
-        dsq = np.ones((bs,c))/bs * dvar;
+        d_mu = 1. / self.sqrt_v * d_hat
         
-        d_v = 2*self.m * dsq
+        d_norm = np.sum(X_mu * d_hat,axis=0)
         
-        d_m = d_hat * self.v
+        dvar_2 = d_norm * -0.5 * (1. /self.sqrt_v)**3
+
+        d_var = np.sum(d_norm * -1. / self.sqrt_v,axis=0) + dvar_2 * np.mean(-2.*X_mu,axis=0)
         
-        d_mv = d_v + d_m
-        
-        d_u = -1 * np.sum(d_mv,axis=0)
-        
-        d_x2 = np.ones((bs,c))/bs * np.repeat(np.reshape(d_u,(1,-1)),bs,axis=0)
-        
-        self.grad_input = d_x2 + d_mv
+        self.grad_input = d_hat * -1/self.sqrt_v + dvar_2 * 2 * X_mu/bs + d_var/bs 
     
         return self.grad_input
+
+    def train(self):
+        self.isTrain = True
+
+    def evaluate(self):
+        self.isTrain = False
 
 
 class Maxpool(Layer):
@@ -403,6 +402,8 @@ class Dropout(Layer):
         return self.output
     
     def backward(self,input_data,grad_from_back):
+
+        grad_from_back = grad_from_back.reshape(input_data.shape)
 
         self.grad_input = grad_from_back / self.saved * self.sample
         
