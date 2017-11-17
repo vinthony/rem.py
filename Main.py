@@ -88,7 +88,6 @@ class CNNWithBN(Model):
         self.bn1 = SpatialBN(32)
         self.bn2 = SpatialBN(32)
         self.bn3 = SpatialBN(32)
-        # self.bn5 = BN(128)
         self.linear1 = Linear(512,49);
         self.linear2 = Linear(49,10); # 
         self.relu1 = NonLinear(subtype='relu')
@@ -206,7 +205,7 @@ if __name__ == '__main__':
     
     _validate = data_loader(test_samples,test_labels,1)
     
-    network = CNNWithBN()
+    network = MLPWithBN()
 
     network.init(init_type)
     
@@ -250,7 +249,7 @@ if __name__ == '__main__':
             if count/10000*100 > best_acc:
                 best_acc = count/10000*100
                 save_model("checkpoints/best_{}_{}.json".format(i,init_type),network)
-            logging.info("iter:{},loss:{:.2f}, accuracy:{:.2f}%,time:{:.2f}h".format(i,loss,count/10000*100),(time.time()-begin)/3600)
+            logging.info("iter:{},loss:{:.2f}, accuracy:{:.2f}%,time:{:.2f}h".format(i,loss,count/10000*100,(time.time()-begin)/3600))
             network.train()
 
     logging.info("total time:{:.2f}h, best accuracy:{:.2f}%, model paramaters:{}".format((time.time()-begin)/3600,best_acc,network.getParametersOfModel()))

@@ -105,9 +105,9 @@ class Model(object):
                 if i.get_name() == 'conv2d':
                     i.set_weights(np.random.normal(0,0.02,i.get_weights().shape))
                     i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
-                if i.get_name() == 'bn':
-                    i.set_weights(np.ones(i.get_weights().shape))
-                    i.set_bias(np.zeros(i.get_bias().shape))
+                # if i.get_name() == 'bn':
+                    # i.set_weights(np.ones(i.get_weights().shape))
+                    # i.set_bias(np.zeros(i.get_bias().shape))
                 if i.get_name() == 'linear':
                     i.set_weights(np.random.normal(0,0.02,i.get_weights().shape))
                     i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
@@ -116,9 +116,9 @@ class Model(object):
                 if i.get_name() == 'conv2d':
                     i.set_weights(np.random.uniform(-math.sqrt(6/(i.input_channel+i.output_channel)),math.sqrt(6/(i.input_channel+i.output_channel)),i.get_weights().shape))
                     i.set_bias(np.random.uniform(-math.sqrt(6/(i.input_channel+i.output_channel)),math.sqrt(6/(i.input_channel+i.output_channel)),i.get_bias().shape))
-                if i.get_name() == 'bn':
-                    i.set_weights(np.random.normal(1,0.02,i.get_weights().shape))
-                    i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+                # if i.get_name() == 'bn':
+                    # i.set_weights(np.ones(i.get_weights().shape))
+                    # i.set_bias(np.zeros(i.get_bias().shape))
                 if i.get_name() == 'linear':
                     i.set_weights(np.random.uniform(-math.sqrt(6/(i.input_channel+i.output_channel)),math.sqrt(6/(i.input_channel+i.output_channel)),i.get_weights().shape))
                     i.set_bias(np.random.uniform(-math.sqrt(6/(i.input_channel+i.output_channel)),math.sqrt(6/(i.input_channel+i.output_channel)),i.get_bias().shape))   
@@ -127,9 +127,9 @@ class Model(object):
                 if i.get_name() == 'conv2d':
                     i.set_weights(np.random.normal(0,math.sqrt(1/i.input_channel),i.get_weights().shape))
                     i.set_bias(np.random.normal(0,math.sqrt(1/i.input_channel),i.get_bias().shape))
-                if i.get_name() == 'bn':
-                    i.set_weights(np.random.normal(1,0.02,i.get_weights().shape))
-                    i.set_bias(np.random.normal(0,0.02,i.get_bias().shape))
+                # if i.get_name() == 'bn':
+                    # i.set_weights(np.ones(i.get_weights().shape))
+                    # i.set_bias(np.zeros(i.get_bias().shape))
                 if i.get_name() == 'linear':
                     i.set_weights(np.random.normal(0,math.sqrt(1/i.input_channel),i.get_weights().shape))
                     i.set_bias(np.random.normal(0,math.sqrt(1/i.input_channel),i.get_bias().shape))

@@ -71,11 +71,11 @@ def im2col(imgray,k,stride,padding):
     count = 0
     for x in range(0,w+2*pc-c+1,sc):
         for y in range(0,h+2*pr-r+1,sr):
-            assert y+r-1 < h+2*pr
-            assert x+c-1 < w+2*pc
+            # assert y+r-1 < h+2*pr
+            # assert x+c-1 < w+2*pc
             re[:,:,count] = np.reshape(larger[:,:,y:y+r,x:x+c],(bs,-1))
             count = count + 1
-    assert count == output_x*output_y
+    # assert count == output_x*output_y
     return re;
 
 def col2im(d_col,shape_x,k,stride,padding):
@@ -95,45 +95,13 @@ def col2im(d_col,shape_x,k,stride,padding):
     count = 0
     for x in range(0,w+2*pc-c+1,sc):
         for y in range(0,h+2*pr-r+1,sr):
-            assert y+r-1 < h+2*pr
-            assert x+c-1 < w+2*pc
+            # assert y+r-1 < h+2*pr
+            # assert x+c-1 < w+2*pc
             re[:,:,y:y+r,x:x+c] += np.reshape(d_col[:,:,count],(bs,ch,k[0],k[1]))
             count = count + 1
-    assert count == ohow
+    # assert count == ohow
     return re[:,:,pr:-pr,pc:-pc]
 
-
-
-def col2im_x(imgray,k,stride,padding,adjr,adjc):
-    bs,ch,h,w = imgray.shape
-    r = k[0];
-    c = k[1];
-    
-    sr = stride[0];
-    sc = stride[1];
-    
-    pr = padding[0];
-    pc = padding[1];
-    output_x = (w-1)*sr - 2*pr + r + adjr
-    output_y = (h-1)*sc - 2*pc + c + adjc
-    larger = np.zeros((bs,ch,output_y+2*pr,output_x+2*pc))
-
-    ix = np.arange(pc,pc+output_x,sc)
-    iy = np.arange(pr,pr+output_y,sr)
-
-    xv, yv = np.meshgrid(ix, iy)
-    
-    larger[:,:,yv,xv] = imgray
-
-    re = np.zeros( (bs,ch*r*c,output_x*output_y),dtype='float32');
-
-    count = 0
-    for x in range(0,output_x+2*pc-c+1):
-        for y in range(0,output_y+2*pr-r+1):
-            re[:,:,count] = np.reshape(larger[:,:,y:y+r,x:x+c],(bs,-1))
-            count = count + 1
-    assert count == output_x*output_y
-    return re
 
 
 if __name__ == '__main__':
