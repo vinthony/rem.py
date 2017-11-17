@@ -246,14 +246,14 @@ class SpatialBN(Layer):
         self.isTrain = False
    
 class BN(Layer):
-    def __init__(self):
+    def __init__(self,channel):
         #https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
         super(BN,self).__init__()
         self.type = 'bn'
-        self.channel = 1
+        self.channel = channel
         self.eps = 1e-9
-        self.weight = 1;
-        self.bias = 0;
+        self.weight = np.ones(channel);
+        self.bias = np.zeros(channel);
         self.real_mean = np.array([])
         self.real_var = np.array([])
         self.isTrain = True
@@ -438,12 +438,9 @@ class Linear(Layer):
         ch = self.input_channel
 
         self.input = input_data
-        #bs x oc
-        self.output = np.zeros((bs,self.output_channel))
         
-        for i in range(bs):
-            # y = W * x + b     ic \times ic x oc + oc
-            self.output[i] = np.dot(input_data[i],self.weight) + self.bias
+        # y = W * x + b     bs x ic \times ic x oc + oc
+        self.output = np.dot(input_data,self.weight) + np.reshape(self.bias,[1,-1])
            
         return self.output
         
@@ -461,18 +458,15 @@ class Linear(Layer):
 
         self.weight_grad.fill(.0)
         self.bias_grad.fill(.0)
-        self.grad_input = np.zeros((bs,c))
         # [oc x ic]      
-        for i in range(bs):
-            # [ oc * ic ]
-            # oc x ic \times  oc x ic
-            self.weight_grad += np.transpose(np.multiply(np.repeat(grad_from_back[i].reshape(-1,1),self.input_channel,axis=1), np.repeat(input_data[i].reshape(1,-1),self.output_channel,axis=0)) )
-            self.bias_grad += grad_from_back[i]
-            self.grad_input[i] =  np.dot(self.weight, grad_from_back[i]) 
 
-        self.weight_grad /= bs
-        self.bias_grad /= bs 
-        self.grad_input /= bs 
+        self.bias_grad = np.mean(grad_from_back,axis=0)
+        
+        # input[bsxocxic],output[bsxocxic],
+        self.weight_grad = np.mean(np.reshape(grad_from_back,(bs,1,-1)) * np.reshape(input_data,(bs,-1,1)),axis=0)
+
+        # bs x oc, oc x ic = bs x ic
+        self.grad_input = np.dot(grad_from_back,self.weight.T) 
 
         return self.grad_input
 

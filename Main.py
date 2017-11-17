@@ -67,8 +67,8 @@ class MLPWithBN(Model):
         self.linear3 = Linear(7*7,10);
         self.relu1 = NonLinear(subtype='relu')
         self.relu2 = NonLinear(subtype='relu')
-        self.BN1 = BN()
-        self.BN2 = BN()
+        self.BN1 = BN(14*14)
+        self.BN2 = BN(7*7)
         
     def forward(self,input_data):
         op = self.linear3(
@@ -206,7 +206,7 @@ if __name__ == '__main__':
     
     _validate = data_loader(test_samples,test_labels,1)
     
-    network = CNNWithBN()
+    network = MLPKeras()
 
     network.init(init_type)
     

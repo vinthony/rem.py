@@ -104,38 +104,6 @@ def col2im(d_col,shape_x,k,stride,padding):
 
 
 
-def col2im_x(imgray,k,stride,padding,adjr,adjc):
-    bs,ch,h,w = imgray.shape
-    r = k[0];
-    c = k[1];
-    
-    sr = stride[0];
-    sc = stride[1];
-    
-    pr = padding[0];
-    pc = padding[1];
-    output_x = (w-1)*sr - 2*pr + r + adjr
-    output_y = (h-1)*sc - 2*pc + c + adjc
-    larger = np.zeros((bs,ch,output_y+2*pr,output_x+2*pc))
-
-    ix = np.arange(pc,pc+output_x,sc)
-    iy = np.arange(pr,pr+output_y,sr)
-
-    xv, yv = np.meshgrid(ix, iy)
-    
-    larger[:,:,yv,xv] = imgray
-
-    re = np.zeros( (bs,ch*r*c,output_x*output_y),dtype='float32');
-
-    count = 0
-    for x in range(0,output_x+2*pc-c+1):
-        for y in range(0,output_y+2*pr-r+1):
-            re[:,:,count] = np.reshape(larger[:,:,y:y+r,x:x+c],(bs,-1))
-            count = count + 1
-    assert count == output_x*output_y
-    return re
-
-
 if __name__ == '__main__':
     im = np.array([[[[1,2,3,4],[5,6,7,8],[9,10,11,12]],[[5,6,7,8],[1,2,3,4],[9,10,11,12]],[[5,6,7,8],[1,2,3,4],[9,10,11,12]]],[[[1,2,3,4],[5,6,7,8],[9,10,11,12]],[[1,2,3,4],[5,6,7,8],[9,10,11,12]],[[1,2,3,4],[5,6,7,8],[9,10,11,12]]]]);
     kernel = [2,2]
