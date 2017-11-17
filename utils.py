@@ -71,11 +71,11 @@ def im2col(imgray,k,stride,padding):
     count = 0
     for x in range(0,w+2*pc-c+1,sc):
         for y in range(0,h+2*pr-r+1,sr):
-            assert y+r-1 < h+2*pr
-            assert x+c-1 < w+2*pc
+            # assert y+r-1 < h+2*pr
+            # assert x+c-1 < w+2*pc
             re[:,:,count] = np.reshape(larger[:,:,y:y+r,x:x+c],(bs,-1))
             count = count + 1
-    assert count == output_x*output_y
+    # assert count == output_x*output_y
     return re;
 
 def col2im(d_col,shape_x,k,stride,padding):
@@ -95,11 +95,11 @@ def col2im(d_col,shape_x,k,stride,padding):
     count = 0
     for x in range(0,w+2*pc-c+1,sc):
         for y in range(0,h+2*pr-r+1,sr):
-            assert y+r-1 < h+2*pr
-            assert x+c-1 < w+2*pc
+            # assert y+r-1 < h+2*pr
+            # assert x+c-1 < w+2*pc
             re[:,:,y:y+r,x:x+c] += np.reshape(d_col[:,:,count],(bs,ch,k[0],k[1]))
             count = count + 1
-    assert count == ohow
+    # assert count == ohow
     return re[:,:,pr:-pr,pc:-pc]
 
 

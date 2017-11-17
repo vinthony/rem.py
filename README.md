@@ -86,6 +86,7 @@ default network structure(as shown above) validates on MNIST test set.
 | MLP(sgd) | -- | 10000(~20epochs) | 85%|
 | MLP(adam)[-1,1] | 4768s |10000(~20epochs) |  97.32% |
 | MLP(adam)[0,1] | 4768s |10000(~20epochs) | 97.67% |
+| MLP(adam)(bn)[0,1] | 4768s |10000(~20epochs) | 98.57% |
 | MLP(adam)(dropout)[0,1] | 4768s |10000(~20epochs) | 98.57% |
 | CNN(adam)[0,1] | -- |4000(~8epochs) | 98.62% |
 | CNN(adam)(dropout)[0,1] | -- |4000(~8epochs) | 99.16% |

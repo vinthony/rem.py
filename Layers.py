@@ -111,6 +111,9 @@ class Conv2d(Layer):
         self.weight_grad = np.zeros((output_channel,input_channel,kernel[0],kernel[1]))
         self.bias  = np.zeros(output_channel)
         self.bias_grad = np.zeros(output_channel)
+        self.idx_x = None
+        self.idx_y = None
+
         # can be improved by remembering the idx of im2col and col2im
         
     def forward(self, input_data):
@@ -146,13 +149,14 @@ class Conv2d(Layer):
     def backward(self, input_data, grad_from_back):
         t = time.time()
         bs,ch,h,w = input_data.shape
+        bs,oc,oh,ow = grad_from_back.shape
        
         self.weight_grad.fill(0.0)
         self.grad_input = np.zeros(input_data.shape)
       
         if grad_from_back.ndim < 4: # better to throw a warning here.
             grad_from_back = np.reshape(grad_from_back, (bs,self.output_channel,self.output_y,self.output_x) )
-        bs,oc,oh,ow = grad_from_back.shape
+
         # (bs,oc,iy,ix)
         self.bias_grad = np.sum(grad_from_back,axis=(0,2,3))
         
@@ -163,7 +167,6 @@ class Conv2d(Layer):
         #bs,oc,ic*k*k,bs
         self.weight_grad = np.mean(np.reshape(np.dot(np.reshape(grad_from_back,(bs*oc,oh*ow)),trans_imcol),(bs,oc,ch,self.kernel[0],self.kernel[1],bs)),axis=(0,5))
         
-                        
         # ic * k * k x oc, oc x ow*oh*bs
         d_col = np.dot(np.reshape(self.weight,(oc,-1)).T,np.reshape(np.transpose(grad_from_back,(1,2,3,0)),(oc,-1)))
         d_colx = np.transpose(np.reshape(d_col,(self.input_channel*self.kernel[0]*self.kernel[1],self.output_x*self.output_y,bs)),(2,0,1))
@@ -193,8 +196,8 @@ class SpatialBN(Layer):
         # update real mean and real var;
         if self.isTrain:
             self.mu = np.mean(input_data,axis=0,keepdims=True)
-            self.vu = np.var(input_data,axis=0,keepdims=True)
-            self.sqrt_v = np.sqrt(self.vu + self.eps) ;
+            self.var = np.var(input_data,axis=0,keepdims=True)
+            self.sqrt_v = np.sqrt(self.var + self.eps) ;
             #normalize [bs,ch,h,w]
             self.x_hat = (input_data - self.mu ) / self.sqrt_v 
             # bs x ch x h x w
@@ -202,10 +205,10 @@ class SpatialBN(Layer):
 
             if self.real_mean.shape == np.array([]).shape:
                 self.real_mean = np.zeros(self.mu.shape)
-                self.real_var = np.ones(self.vu.shape)
+                self.real_var = np.ones(self.var.shape)
             else:
                 self.real_mean = self.real_mean * 0.9 + self.mu * 0.1
-                self.real_var = self.real_var * 0.9 +  self.vu * 0.1
+                self.real_var = self.real_var * 0.9 +  self.var * 0.1
         else:
             self.test_sqrt_var = np.sqrt(self.real_var + self.eps) 
             #normalize [bs,ch,h,w]
@@ -229,9 +232,9 @@ class SpatialBN(Layer):
         
         d_mu = 1. / self.sqrt_v * d_hat
         
-        d_norm = np.sum(X_mu * d_hat,axis=0,keepdims=True)
+        d_norm = X_mu * d_hat
         
-        dvar_2 = d_norm * -0.5 * (1. /self.sqrt_v)**3
+        dvar_2 = np.sum(d_norm * -0.5 * (1. /self.sqrt_v)**3,axis=0,keepdims=True)
 
         d_var = np.sum(d_norm * -1. / self.sqrt_v,axis=0,keepdims=True) + dvar_2 * np.mean(-2.*X_mu,axis=0,keepdims=True)
         
@@ -252,8 +255,8 @@ class BN(Layer):
         self.type = 'bn'
         self.channel = channel
         self.eps = 1e-9
-        self.weight = np.ones(channel);
-        self.bias = np.zeros(channel);
+        self.weight = np.random.uniform(0,1,size=(1,channel));
+        self.bias = np.zeros((1,channel));
         self.real_mean = np.array([])
         self.real_var = np.array([])
         self.isTrain = True
@@ -261,25 +264,28 @@ class BN(Layer):
     def forward(self,input_data):
 
         bs,c = input_data.shape
+
+        self.input = input_data
         
         if self.isTrain:
-           
+            # 1xc
             self.mu = np.mean(input_data,axis=0)
-            self.vu = np.var(input_data,axis=0)
-            self.sqrt_v = np.sqrt(self.vu + self.eps);
+            # 1xc
+            self.var = np.var(input_data,axis=0)
+            # 
+            self.sqrt_v = np.sqrt(self.var + self.eps);
             #normalize [bs,ch]
             self.x_hat = (input_data - self.mu ) / self.sqrt_v 
-            # bs x ch x h x w
+            # bs x ch 
             self.output = self.x_hat * self.weight + self.bias
 
             if self.real_mean.shape == np.array([]).shape:
                 self.real_mean = np.zeros(self.mu.shape)
-                self.real_var = np.ones(self.vu.shape)
+                self.real_var = np.ones(self.var.shape)
             else:
                 self.real_mean = self.real_mean * 0.9 + self.mu * 0.1
-                self.real_var = self.real_var * 0.9 +  self.vu * 0.1
+                self.real_var = self.real_var * 0.9 +  self.var * 0.1
         else:
-          
             self.test_sqrt_var = np.sqrt(self.real_var+ self.eps) ;
             #normalize [bs,ch 
             self.x_hat = (input_data - self.real_mean ) / self.test_sqrt_var
@@ -296,19 +302,21 @@ class BN(Layer):
         self.weight_grad = np.sum(self.x_hat*grad_from_back,axis=0)
         
         X_mu = self.input - self.mu
+
+        std_inv = 1. / np.sqrt(self.var)
         
         d_hat = self.weight * grad_from_back
         
-        d_mu = 1. / self.sqrt_v * d_hat
+        d_mu = std_inv * d_hat
         
-        d_norm = np.sum(X_mu * d_hat,axis=0)
+        d_norm = X_mu * d_hat
         
-        dvar_2 = d_norm * -0.5 * ((1. /self.sqrt_v)**3)
+        dvar_2 = np.sum(d_norm * -0.5 * ((1. /self.sqrt_v)**3),axis=0)
 
-        d_var = np.sum(d_norm * -1. / self.sqrt_v,axis=0) + dvar_2 * np.mean(-2.*X_mu,axis=0)
+        d_var = np.sum(d_norm * -std_inv,axis=0) + dvar_2 * np.mean(-2.*X_mu,axis=0)
         
-        self.grad_input = d_hat * 1/self.sqrt_v + dvar_2 * 2 * X_mu/bs + d_var/bs 
-    
+        self.grad_input = d_hat * std_inv + dvar_2 * 2 * X_mu/bs + d_var/bs 
+        
         return self.grad_input
 
     def train(self):
@@ -460,10 +468,10 @@ class Linear(Layer):
         self.bias_grad.fill(.0)
         # [oc x ic]      
 
-        self.bias_grad = np.mean(grad_from_back,axis=0)
+        self.bias_grad = np.sum(grad_from_back,axis=0)
         
         # input[bsxocxic],output[bsxocxic],
-        self.weight_grad = np.mean(np.reshape(grad_from_back,(bs,1,-1)) * np.reshape(input_data,(bs,-1,1)),axis=0)
+        self.weight_grad = np.sum(np.reshape(grad_from_back,(bs,1,-1)) * np.reshape(input_data,(bs,-1,1)),axis=0)
 
         # bs x oc, oc x ic = bs x ic
         self.grad_input = np.dot(grad_from_back,self.weight.T) 
@@ -473,10 +481,16 @@ class Linear(Layer):
 
 
 if __name__ == '__main__':
-    c = Conv2d(1,3,[3,3],[1,1],[1,1])
-    c.weight = np.reshape(np.repeat(np.array([[[1,1,1],[1,1,1],[1,1,1]]]),3,axis=0),(3,1,3,3))
+    # c = Conv2d(1,3,[3,3],[1,1],[1,1])
+    # c.weight = np.reshape(np.repeat(np.array([[[1,1,1],[1,1,1],[1,1,1]]]),3,axis=0),(3,1,3,3))
 
-    print(np.array([[[[1,2,3,4],[5,6,7,8],[9,10,11,12]]]]))
-    o = c(np.array([[[[1,2,3,4],[5,6,7,8],[9,10,11,12]]]]))
+    # print(np.array([[[[1,2,3,4],[5,6,7,8],[9,10,11,12]]]]))
+    # o = c(np.array([[[[1,2,3,4],[5,6,7,8],[9,10,11,12]]]]))
 
-    print(o)
+    # print(o)
+
+
+    b = BN(4)
+    o = b(np.array([[1,2,3,4],[5,6,7,8]]))
+    c = b.backward(np.array([[1,2,3,4],[5,6,7,8]]),np.array([[1,1,1,1],[0,0,0,0]]))
+    print(c)

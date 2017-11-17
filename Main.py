@@ -88,7 +88,6 @@ class CNNWithBN(Model):
         self.bn1 = SpatialBN(32)
         self.bn2 = SpatialBN(32)
         self.bn3 = SpatialBN(32)
-        # self.bn5 = BN(128)
         self.linear1 = Linear(512,49);
         self.linear2 = Linear(49,10); # 
         self.relu1 = NonLinear(subtype='relu')
@@ -206,7 +205,7 @@ if __name__ == '__main__':
     
     _validate = data_loader(test_samples,test_labels,1)
     
-    network = MLPKeras()
+    network = MLPWithBN()
 
     network.init(init_type)
     
