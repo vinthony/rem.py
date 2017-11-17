@@ -6,7 +6,7 @@ a toy neural network based on python
 
 * layers:
     - [x] Conv2d
-    - [x] Batch normalization (some bugs here)
+    - [x] Batch normalization  
     - [x] Maxpooling / Averagepooling
     - [x] relu
     - [x] linear
