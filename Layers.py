@@ -15,7 +15,7 @@ class Layer(object):
     register_id = 0
     def __init__(self,callid=None):
         self.type = 'Layer'
-        self.callid = None
+        self.callid = callid
         self.register_id = None
         
         self.m = np.array([])
@@ -99,8 +99,8 @@ class NonLinear(Layer):
         return self.grad_input
     
 class Conv2d(Layer):
-    def __init__(self,input_channel,output_channel,kernel,stride,padding):
-        super(Conv2d,self).__init__()
+    def __init__(self,input_channel,output_channel,kernel,stride,padding,**kwags):
+        super(Conv2d,self).__init__(**kwags)
         self.type = 'conv2d'
         self.input_channel = input_channel
         self.output_channel  = output_channel
@@ -177,8 +177,8 @@ class Conv2d(Layer):
 
 
 class SpatialBN(Layer):
-    def __init__(self,channel):
-        super(SpatialBN,self).__init__()
+    def __init__(self,channel,**kwags):
+        super(SpatialBN,self).__init__(**kwags)
         #https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
         self.type = 'bn'
         self.channel = channel
@@ -249,9 +249,9 @@ class SpatialBN(Layer):
         self.isTrain = False
    
 class BN(Layer):
-    def __init__(self,channel):
+    def __init__(self,channel,**kwags):
         #https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
-        super(BN,self).__init__()
+        super(BN,self).__init__(**kwags)
         self.type = 'bn'
         self.channel = channel
         self.eps = 1e-9
