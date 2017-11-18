@@ -1,6 +1,5 @@
 import numpy as np
 import struct
-import math
 
 def save_model(filename,network):
     with open(filename, 'w') as f:
@@ -13,7 +12,7 @@ def getMatrixOfClass(target_data,labels=10):
     mx[idx[:],target_data[:]] = 1;
     return mx
 
-def data_loader(image,label,batch_size):
+def data_loader(image,label,batch_size,is_shuffle=True):
     with open(label,'rb') as lb:
         # file header [0,9]
         m,n = struct.unpack('>II',lb.read(8))
@@ -28,9 +27,8 @@ def data_loader(image,label,batch_size):
     while True:
         idxs = np.arange(length)
         
-        if batch_size > 1:
-            np.random.shuffle(idxs)
-
+        if is_shuffle: np.random.shuffle(idxs)
+        
         for batch_idx in range(0,length,batch_size):
 
             batch_label = labels[batch_idx:batch_idx+batch_size]

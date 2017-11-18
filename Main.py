@@ -46,6 +46,23 @@ class MLPKeras(Model):
         op = self.linear3(self.dropout2(self.relu2(self.linear2(self.dropout1(self.relu1(self.linear1(input_data)))))))
         return op
 
+class MLPKerasBN(Model):
+    def __init__(self):
+        super(MLPKerasBN,self).__init__()
+        self.linear1 = Linear(28*28,512);
+        self.linear2 = Linear(512,512);
+        self.linear3 = Linear(512,10);
+        self.dropout1 = Dropout(0.2)
+        self.dropout2 = Dropout(0.2)
+        self.relu1 = NonLinear(subtype='relu')
+        self.relu2 = NonLinear(subtype='relu')
+        self.BN1 = BN(512)
+        self.BN2 = BN(512)
+        
+    def forward(self,input_data):
+        op = self.linear3(self.dropout2(self.relu2(self.BN2(self.linear2(self.dropout1(self.relu1(self.BN1(self.linear1(input_data)))))))))
+        return op
+    
 class MLP(Model):
     def __init__(self):
         super(MLP,self).__init__()
@@ -184,8 +201,6 @@ if __name__ == '__main__':
     traing_labels = 'dataset/train-labels.idx1-ubyte'
     test_samples = 'dataset/t10k-images.idx3-ubyte'
     test_labels = 'dataset/t10k-labels.idx1-ubyte'
-    
-    model_path = 'iteration_20.json'
 
     name = time.time()
 
@@ -203,9 +218,9 @@ if __name__ == '__main__':
      
     _iter = data_loader(traing_samples,traing_labels,batch_size)
     
-    _validate = data_loader(test_samples,test_labels,1)
+    _validate = data_loader(test_samples,test_labels,1,False)
     
-    network = MLPWithBN()
+    network = CNNKeras()
 
     network.init(init_type)
     
@@ -233,9 +248,6 @@ if __name__ == '__main__':
         network.backward(input_image,d_loss_network)
         
         optimizer(parameters)
-        
-        if i % save_iter == 0:
-            save_model("checkpoints/iteration_n_{}_{}.json".format(i,init_type),network)
             
         if (i+1) % validate_iter == 0:
             network.evaluate()
@@ -248,7 +260,7 @@ if __name__ == '__main__':
                 count = count + accuracy(vxlabel,vlabel)
             if count/10000*100 > best_acc:
                 best_acc = count/10000*100
-                save_model("checkpoints/best_{}_{}.json".format(i,init_type),network)
+                save_model("checkpoints/best_{}.json".format(network.__class__.__name__),network)
             logging.info("iter:{},loss:{:.2f}, accuracy:{:.2f}%,time:{:.2f}h".format(i,loss,count/10000*100,(time.time()-begin)/3600))
             network.train()
 
