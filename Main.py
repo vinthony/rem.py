@@ -220,7 +220,7 @@ if __name__ == '__main__':
     
     _validate = data_loader(test_samples,test_labels,1,False)
     
-    network = CNNKeras()
+    network = CNNKerasDropout()
 
     network.init(init_type)
     
