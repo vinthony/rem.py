@@ -52,12 +52,22 @@ class Model(object):
                 # build network from stack
                 # sort the stack 
                 for k2 in json.loads(v):
-                    if k2['type'] == 'linear' or k2['type'] == 'conv2d' or k2['type'] == 'bn':
+                    if k2['type'] == 'linear':
                         l = Linear(k2['input_channel'],k2['output_channel'],callid=k2['callid'])
+                        l.set_weights(np.asarray(k2['weight']))
+                        l.set_bias(np.asarray(k2['bias']))
+                    if k2['type'] == 'conv2d':
+                        l = Conv2d(k2['input_channel'],k2['output_channel'],k2['kernel'],k2['stride'],k2['padding'],callid=k2['callid'])
+                        l.set_weights(np.asarray(k2['weight']))
+                        l.set_bias(np.asarray(k2['bias']))
+                    if k2['type'] == 'bn':
+                        l = BN(k2['channel'],callid=k2['callid'])
                         l.set_weights(np.asarray(k2['weight']))
                         l.set_bias(np.asarray(k2['bias']))
                     if k2['type'] == 'relu':
                         l = NonLinear('relu',callid=k2['callid'])
+                    if k2['type'] == 'dropout':
+                        l = Dropout(k2['prob'],callid=k2['callid'])
                     network.stack.append(l)          
         return network
         
@@ -91,8 +101,7 @@ class Model(object):
         return self.model_size
                 
     def foward_stack(self):
-        if not self.stack:
-            self.init_stack()
+        self.stack.sort(key=lambda x:x.callid)
         return self.stack
     
 
