@@ -2,7 +2,7 @@
 
 a toy neural network based on python
 
-# todo
+# Todo
 
 * layers:
     - [x] Conv2d
@@ -38,15 +38,20 @@ a toy neural network based on python
     - [x] MLP
     - [x] CNN
 
-# easy to use
+# Before train
+
+> download the MNIST from http://yann.lecun.com/exdb/mnist/ and create a folder name dataset to unzip the files
+> you can also change the dir of file directly in `train.py`
+
+# Easy to use
 
 a MNIST example can be run as :
 
 ```
-python Main.py
+python train.py
 ```
 
-# easy to define the network
+# Easy to define the network
 
 * you need to implement the `Network` class for your model , this class should inherit from `Model`
 
@@ -70,14 +75,15 @@ class Network(Model):
 
 ```
 
-# currently
+# Currently
 
-currently, I am checking the network structure from `gc`, it is ugly and hackable for feed-forward network.
+1. Currently, I am checking the network structure from `gc`, it is ugly and hackable for feed-forward network.
 
 I will find someway else for more complex network structure.
 
+2. Currently, the API of design will changed heavily and the code will be optimized for faster inference. 
 
-# some results
+# Some results
 
 default network structure(as shown above) validates on MNIST test set.
 
