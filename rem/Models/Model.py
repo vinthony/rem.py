@@ -1,6 +1,6 @@
 import json
 import math
-from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool,Dropout
+from rem.Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool,Dropout
 import numpy as np
 import gc
 import copy

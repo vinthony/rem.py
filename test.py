@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
-from Models import Model
-from utils import getMatrixOfClass,save_model,data_loader,accuracy   
+from rem.Models.Model import Model
+from rem.Utils.utils import getMatrixOfClass,save_model,data_loader,accuracy   
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', help='add_model')

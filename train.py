@@ -8,13 +8,13 @@ This is a temporary script file.
 import numpy as np
 import time
 import datetime
-from Models import Model
+from rem.Models.Model import Model
 import logging
 
-from Optimizer import Optimizer
-from Criterions import CrossEntropy
-from utils import getMatrixOfClass,save_model,data_loader,accuracy   
-from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool,Dropout,SpatialBN
+from rem.Optimizers import Optimizer
+from rem.Criterions import CrossEntropy
+from rem.Utils.utils import getMatrixOfClass,save_model,data_loader,accuracy   
+from rem.Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool,Dropout,SpatialBN
 
 class MLPWithDropout(Model):
     def __init__(self):

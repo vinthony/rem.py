@@ -1,6 +1,6 @@
 import argparse
-from Models import Model
-from utils import getMatrixOfClass,save_model,data_loader,accuracy   
+from rem.Models.Model import Model
+from rem.Utils.utils import getMatrixOfClass,save_model,data_loader,accuracy      
 from os import listdir
 from os.path import isfile, join
 from PIL import Image
