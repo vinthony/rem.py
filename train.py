@@ -125,10 +125,7 @@ class CNNKerasDropout(Model):
         super(CNNKerasDropout,self).__init__()
         self.conv1 = Conv2d(1,32,[3,3],[1,1],[1,1]); # 28x28 -> 32 x 28 x 28
         self.conv2 = Conv2d(32,64,[3,3],[2,2],[1,1]); # 32x14x14 -> 64 x 7 x 7
-#        self.bn1 = SpatialBN(32)
-#        self.bn2 = SpatialBN(32)
-#        self.bn3 = SpatialBN(32)
-        # self.bn5 = BN(128)
+
         self.dropout1 = Dropout(0.25)
         self.dropout2 = Dropout(0.5)
         self.linear1 = Linear(12544,128);

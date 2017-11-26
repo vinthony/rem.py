@@ -1,5 +1,7 @@
 import numpy as np
 import struct
+from PIL import Image,ImageOps
+import random
 
 def save_model(filename,network):
     with open(filename, 'w') as f:
@@ -34,10 +36,22 @@ def data_loader(image,label,batch_size,is_shuffle=True):
             batch_label = labels[batch_idx:batch_idx+batch_size]
             batch_image = images[batch_idx:batch_idx+batch_size].astype('float32')
             #normalize
-            batch_image = (batch_image/255.0)
+            batch_image = data_augmentation(batch_image/255.0)
         
             yield batch_image,batch_label
-            
+
+
+def data_augmentation(batch_image):
+    bs,_,_ = batch_image.shape
+    imre = np.zeros((bs,1,28,28))
+    idx = np.arange
+    for i in range(bs):
+        imtemp = Image.fromarray(np.reshape(batch_image[i],(28,28)))
+        imtemp.rotate((random.random()-0.5)*30)
+        imre[i] = np.array(imtemp)
+
+    return imre
+
 def accuracy(input_label, target_label):
     input_label = np.reshape(input_label,(1,-1))
     target_label = np.reshape(target_label,(1,-1))

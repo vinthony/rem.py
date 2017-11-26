@@ -99,8 +99,8 @@ class NonLinear(Layer):
         return self.grad_input
     
 class Conv2d(Layer):
-    def __init__(self,input_channel,output_channel,kernel,stride,padding,**kwags):
-        super(Conv2d,self).__init__(**kwags)
+    def __init__(self,input_channel,output_channel,kernel,stride,padding):
+        super(Conv2d,self).__init__()
         self.type = 'conv2d'
         self.input_channel = input_channel
         self.output_channel  = output_channel
@@ -111,10 +111,6 @@ class Conv2d(Layer):
         self.weight_grad = np.zeros((output_channel,input_channel,kernel[0],kernel[1]))
         self.bias  = np.zeros(output_channel)
         self.bias_grad = np.zeros(output_channel)
-        self.idx_x = None
-        self.idx_y = None
-
-        # can be improved by remembering the idx of im2col and col2im
         
     def forward(self, input_data):
         # bs x ch x w x h
@@ -136,42 +132,42 @@ class Conv2d(Layer):
         # (oc , ic*k*k) 
         bs_weight = np.reshape(self.weight,[self.output_channel,-1]);
         
-        # (ic*k*k,oy*ox*bs)   
-        reshaped_imcol = np.reshape(np.transpose(self.imcol_all,(2,1,0)),(self.input_channel*self.kernel[0]*self.kernel[1],-1))
-
-        #(oc,oy*ox*bs) + (oc,1)
-        M = np.dot(bs_weight,reshaped_imcol) + bs_bais ;
-        
-        self.output = np.transpose(np.reshape(M,(self.output_channel,self.output_y,self.output_x,bs)),(3,0,1,2))
+        for i in range(bs):
+            #(oc,oy*ox) + (oc,1)
+            M = np.dot(bs_weight,self.imcol_all[i]) + bs_bais;
+            self.output[i,:,:,:] = np.reshape(M,(self.output_channel,self.output_y,self.output_x))
 
         return self.output
     
     def backward(self, input_data, grad_from_back):
         t = time.time()
         bs,ch,h,w = input_data.shape
-        bs,oc,oh,ow = grad_from_back.shape
        
+
         self.weight_grad.fill(0.0)
         self.grad_input = np.zeros(input_data.shape)
       
         if grad_from_back.ndim < 4: # better to throw a warning here.
             grad_from_back = np.reshape(grad_from_back, (bs,self.output_channel,self.output_y,self.output_x) )
-
+        bs,oc,oh,ow = grad_from_back.shape
         # (bs,oc,iy,ix)
         self.bias_grad = np.sum(grad_from_back,axis=(0,2,3))
         
-        #( x*y, ic*k*k,bs)
-        trans_imcol = np.reshape(np.transpose(self.imcol_all,(2,1,0)),(self.output_x*self.output_y,self.input_channel*self.kernel[0]*self.kernel[1]*bs))
+        #(bs, x*y, ic*k*k)
+        trans_imcol = np.transpose(self.imcol_all,(0,2,1))
         # (bs, oc , oy*ox)
+        for i in range(bs):
+            self.weight_grad += np.reshape(np.dot(np.reshape(grad_from_back[i],(oc,oh*ow)),trans_imcol[i]),(oc,ch,self.kernel[0],self.kernel[1]))
         
-        #bs,oc,ic*k*k,bs
-        self.weight_grad = np.mean(np.reshape(np.dot(np.reshape(grad_from_back,(bs*oc,oh*ow)),trans_imcol),(bs,oc,ch,self.kernel[0],self.kernel[1],bs)),axis=(0,5))
+        self.weight_grad = self.weight_grad/bs;
         
-        # ic * k * k x oc, oc x ow*oh*bs
-        d_col = np.dot(np.reshape(self.weight,(oc,-1)).T,np.reshape(np.transpose(grad_from_back,(1,2,3,0)),(oc,-1)))
-        d_colx = np.transpose(np.reshape(d_col,(self.input_channel*self.kernel[0]*self.kernel[1],self.output_x*self.output_y,bs)),(2,0,1))
+        d_col = np.zeros((bs,self.input_channel*self.kernel[0]*self.kernel[1],oh*ow))
+        
+        for i in range(bs):
+            d_col[i] = np.dot(np.reshape(self.weight,(oc,-1)).T,np.reshape(grad_from_back[i],(oc,-1)))
+
         # reshape the d_col to image. d_col[bs,ic*k*k,oh*ow]
-        self.grad_input = col2im(d_colx,input_data.shape,self.kernel,self.stride,self.padding)
+        self.grad_input = col2im(d_col,input_data.shape,self.kernel,self.stride,self.padding)
 
         return self.grad_input
 
@@ -180,7 +176,7 @@ class SpatialBN(Layer):
     def __init__(self,channel,**kwags):
         super(SpatialBN,self).__init__(**kwags)
         #https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
-        self.type = 'bn'
+        self.type = 'sbn'
         self.channel = channel
         self.eps = 1e-5
         self.weight = np.ones(channel);

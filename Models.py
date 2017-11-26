@@ -1,6 +1,6 @@
 import json
 import math
-from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool
+from Layers import Conv2d,NonLinear,BN,Linear,Layer,Maxpool,Averagepool,Dropout
 import numpy as np
 import gc
 import copy
@@ -52,6 +52,7 @@ class Model(object):
                 # build network from stack
                 # sort the stack 
                 for k2 in json.loads(v):
+                    print(k2['type']+'<=',end='')
                     if k2['type'] == 'linear':
                         l = Linear(k2['input_channel'],k2['output_channel'],callid=k2['callid'])
                         l.set_weights(np.asarray(k2['weight']))
@@ -64,11 +65,16 @@ class Model(object):
                         l = BN(k2['channel'],callid=k2['callid'])
                         l.set_weights(np.asarray(k2['weight']))
                         l.set_bias(np.asarray(k2['bias']))
+                    if k2['type'] == 'sbn':
+                        l = SpatialBN(k2['channel'],callid=k2['callid'])
+                        l.set_weights(np.asarray(k2['weight']))
+                        l.set_bias(np.asarray(k2['bias']))
                     if k2['type'] == 'relu':
                         l = NonLinear('relu',callid=k2['callid'])
                     if k2['type'] == 'dropout':
                         l = Dropout(k2['prob'],callid=k2['callid'])
-                    network.stack.append(l)          
+                    network.stack.append(l)  
+                print('')        
         return network
         
     def forward(self,input_data):
@@ -95,7 +101,7 @@ class Model(object):
         if not self.stack:
             self.init_stack()
         for i in self.stack:
-            if i.get_name() == 'conv2d' or i.get_name() == 'linear' or i.get_name() == 'bn':
+            if i.get_name() == 'conv2d' or i.get_name() == 'linear' or i.get_name() == 'bn'or i.get_name() == 'sbn':
                 self.model_size = self.model_size + i.get_weights().size + i.get_bias().size
                 
         return self.model_size
