@@ -3,8 +3,8 @@ from rem.Layers.Layer import Layer
 from rem.Utils.utils import im2col,col2im
 
 class Conv2d(Layer):
-    def __init__(self,input_channel,output_channel,kernel,stride,padding):
-        super(Conv2d,self).__init__()
+    def __init__(self,input_channel,output_channel,kernel,stride,padding,**kwags):
+        super(Conv2d,self).__init__(**kwags)
         self.type = 'conv2d'
         self.input_channel = input_channel
         self.output_channel  = output_channel

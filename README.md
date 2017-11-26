@@ -87,13 +87,12 @@ I will find someway else for more complex network structure.
 
 default network structure(as shown above) validates on MNIST test set.
 
-|network| iteration | time | accuracy|
+|network|   |  iteration | accuracy|
 |---|----|----| --- |
-| MLP(sgd) | -- | 10000(~20epochs) | 85%|
-| MLP(adam)[-1,1] | 4768s |10000(~20epochs) |  97.32% |
-| MLP(adam)[0,1] | 4768s |10000(~20epochs) | 97.67% |
-| MLP(adam)(bn)[0,1] | 4768s |10000(~20epochs) | 98.57% |
+| MLP(adam)[-1,1] | 1.37h |10000(~20epochs) |  97.32% |
+| MLP(adam)[0,1] | 1.37h |10000(~20epochs) | 97.67% |
+| MLP(adam)(bn)[0,1] | -- |10000(~20epochs) | 98.57% |
 | MLP(adam)(dropout)[0,1] | 1.37h |10000(~20epochs) | 98.56% |
-| CNN(adam)[0,1] | -- |4000(~8epochs) | 98.62% |
-| CNN(adam)(dropout)[0,1] | -- |4000(~8epochs) | 99.16% |
+| CNN(adam)[0,1] | 5h |4000(~8epochs) | 98.62% |
+| CNN(adam)(dropout)[0,1] | 5h |6000(~12epochs) | 99.17% |
 
