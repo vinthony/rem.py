@@ -102,6 +102,5 @@ pretrained/
 dataset/
 dataset/*.idx3-ubyte
 dataset/*.idx1-ubyte
-logs.txt
 conv2d.py
 test_conv2d.py
