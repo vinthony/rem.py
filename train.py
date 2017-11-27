@@ -194,10 +194,10 @@ if __name__ == '__main__':
     save_iter = 50
     validate_iter = 50
     
-    traing_samples = 'dataset/train-images.idx3-ubyte' 
-    traing_labels = 'dataset/train-labels.idx1-ubyte'
-    test_samples = 'dataset/t10k-images.idx3-ubyte'
-    test_labels = 'dataset/t10k-labels.idx1-ubyte'
+    traing_samples = 'dataset/train-images-idx3-ubyte' 
+    traing_labels = 'dataset/train-labels-idx1-ubyte'
+    test_samples = 'dataset/t10k-images-idx3-ubyte'
+    test_labels = 'dataset/t10k-labels-idx1-ubyte'
 
     name = time.time()
 

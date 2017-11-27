@@ -40,8 +40,9 @@ a toy neural network based on python
 
 # Before train
 
-> download the MNIST from http://yann.lecun.com/exdb/mnist/ and create a folder name dataset to unzip the files
-> you can also change the dir of file directly in `train.py`
+```
+make  #perpare the datasets && pretrain-ed model && libs
+```
 
 # Easy to use
 
